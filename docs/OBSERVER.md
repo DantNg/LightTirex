@@ -74,6 +74,11 @@ ipc_bus_subscribe_service(TOPIC_DATA_READY, SVC_UPLOADER, MSG_EV_DATA_READY);
 | Chi phí mỗi lần giao | không | một lần tra bảng tên |
 | Dùng cho | listener không bao giờ restart (console, UI cục bộ) | **mọi dịch vụ** |
 
+> **Trong service, đừng gọi thẳng hai hàm trên.** Tầng service có một cửa
+> chung là `svc_listen_topic(self, topic, as_what)` — nó luôn đăng ký theo tên,
+> lấy tên từ `self->name`. Phần này mô tả tầng lõi bên dưới nó. Xem
+> [SERVICE_API.md](SERVICE_API.md#một-cửa-duy-nhất-ra-thế-giới-bên-ngoài).
+
 Trong hệ IoT, tất cả service đều đăng ký **theo tên**. Xem
 [enqueue_to_subscriber() — ipc_event.c:208](../core/src/ipc_event.c#L208): handler được phân
 giải ngay trước khi giao, nên một dịch vụ vừa được hồi sinh với handler mới
@@ -320,7 +325,8 @@ Hệ thống chịu áp lực đó ở ba tầng:
 
 | Sai | Hệ quả | Đúng |
 |---|---|---|
-| Đăng ký theo con trỏ cho dịch vụ có thể restart | mất sự kiện sau khi hồi sinh | `ipc_bus_subscribe_service()` |
+| Đăng ký theo con trỏ cho dịch vụ có thể restart | mất sự kiện sau khi hồi sinh | `svc_listen_topic()` |
+| Service gọi thẳng `ipc_bus_*` / `ipc_health_report()` | tên dịch vụ viết tay, sao chép nhầm là báo dưới tên người khác | các hàm `svc_*` lấy danh tính từ `self` |
 | Dịch vụ tự đăng ký nghe mà quên hủy cái cũ | nhận **hai lần** mỗi sự kiện | để khung làm, chỉ điền `on_subscribe` |
 | Làm việc nặng trong death recipient | chặn task supervisor | đẩy message đi |
 | Retained cho dữ liệu đo | người mới vào nhận mẫu cũ như mẫu mới | retained chỉ cho **trạng thái** |
@@ -339,7 +345,7 @@ chạy. Ánh xạ:
 | event manager | `ipc_event.c` (bảng đăng ký + hàm `publish`) |
 | hàng đợi độc lập của mỗi service | hàng đợi của `ipc_looper_t` mỗi service |
 | EM bỏ message vào hàng đợi listener | `enqueue_to_subscriber()` → `ipc_handler_send()` |
-| service register listener | `ipc_bus_subscribe_service()` trong `on_subscribe` |
+| service register listener | `svc_listen_topic()` trong `on_subscribe` |
 
 Khác biệt duy nhất còn lại: **event manager ở đây là một module, không phải một
 service có task riêng.** `ipc_bus_publish()` chạy ngay trên task của người công

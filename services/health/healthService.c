@@ -12,7 +12,9 @@
 #include "health/healthService.h"
 #include "common/services.h"
 
-#include "ipc_event.h"
+/* Dich vu duy nhat duoc phep dung hai header nay: no CHINH LA noi dat chinh
+ * sach suc khoe va la cau noi sang supervisor. Cac dich vu khac chi bao su
+ * viec qua svc_report_*(). */
 #include "ipc_health.h"
 #include "ipc_supervisor.h"
 
@@ -43,14 +45,15 @@ static bool recover(const char *service, ipc_looper_t *lp, void *user)
 static void on_health_event(const char *source, uint32_t code, ipc_severity_t sev,
                             ipc_health_action_t act, int32_t detail, void *user)
 {
-    (void)source; (void)code; (void)detail; (void)user;
+    app_service_t *self = (app_service_t *)user;
+    (void)source; (void)code; (void)detail;
 
     /* Cong bo trang thai kem GIU LAI: dich vu nao vua hoi sinh va dang ky
      * nghe cung biet ngay he thong dang o tinh trang gi. */
     bool bad = (sev >= IPC_SEV_ERROR) || (act >= IPC_ACT_RESTART_SERVICE);
     if (bad != s_state.degraded) {
         s_state.degraded = bad;
-        ipc_bus_publish_retained(TOPIC_HEALTH_STATE, bad ? 0 : 1, (int32_t)sev);
+        svc_publish_state(self, TOPIC_HEALTH_STATE, bad ? 0 : 1, (int32_t)sev);
     }
 }
 
@@ -103,16 +106,16 @@ static void health_on_create(app_service_t *self)
     hc.check_interval_ms = 500;
     hc.priority = 18;
     hc.own_task = acfg->spawn_tasks;   /* test tu goi ipc_health_check() */
+    hc.user = self;                    /* de on_event biet no dang noi thay ai */
     ipc_health_start(&hc);
 
     install_rules();
-    ipc_bus_publish_retained(TOPIC_HEALTH_STATE, 1, 0);
+    svc_publish_state(self, TOPIC_HEALTH_STATE, 1, 0);
 }
 
 static void health_on_subscribe(app_service_t *self)
 {
-    (void)self;
-    ipc_bus_subscribe_service(TOPIC_ALERT, SVC_HEALTH, MSG_EV_ALERT);
+    svc_listen_topic(self, TOPIC_ALERT, MSG_EV_ALERT);
 }
 
 /* ---------------- xu ly tung loai message ---------------- */

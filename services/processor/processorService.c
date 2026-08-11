@@ -12,8 +12,6 @@
 #include "processor/processorService.h"
 #include "common/services.h"
 
-#include "ipc_event.h"
-
 #define WINDOW 4
 
 typedef struct {
@@ -38,17 +36,17 @@ static int32_t push_and_average(int32_t v)
     return (int32_t)(sum / (int32_t)s_state.filled);
 }
 
-static void check_thresholds(int32_t avg)
+static void check_thresholds(app_service_t *self, int32_t avg)
 {
     int32_t hi = ipc_cfg_get_int(CFG_ALERT_HIGH, 30000);
     int32_t lo = ipc_cfg_get_int(CFG_ALERT_LOW, 15000);
 
     if (avg > hi) {
         s_state.alerts++;
-        ipc_bus_publish(TOPIC_ALERT, avg, 1);
+        svc_publish_topic(self, TOPIC_ALERT, avg, 1);
     } else if (avg < lo) {
         s_state.alerts++;
-        ipc_bus_publish(TOPIC_ALERT, avg, -1);
+        svc_publish_topic(self, TOPIC_ALERT, avg, -1);
     }
 }
 
@@ -66,20 +64,18 @@ static void processor_on_create(app_service_t *self)
 
 static void processor_on_subscribe(app_service_t *self)
 {
-    (void)self;
-    ipc_bus_subscribe_service(TOPIC_SENSOR_SAMPLE, SVC_PROCESSOR,
-                              MSG_EV_SENSOR_SAMPLE);
+    svc_listen_topic(self, TOPIC_SENSOR_SAMPLE, MSG_EV_SENSOR_SAMPLE);
 }
 
 /* ---------------- xu ly tung loai message ---------------- */
 
 static bool on_sensor_sample(app_service_t *self, ipc_message_t *msg)
 {
-    (void)self;
     s_state.last_avg = push_and_average(msg->arg1);
     s_state.processed++;
-    ipc_bus_publish(TOPIC_DATA_READY, s_state.last_avg, (int32_t)s_state.processed);
-    check_thresholds(s_state.last_avg);
+    svc_publish_topic(self, TOPIC_DATA_READY, s_state.last_avg,
+                      (int32_t)s_state.processed);
+    check_thresholds(self, s_state.last_avg);
     return true;
 }
 

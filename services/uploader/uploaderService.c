@@ -15,11 +15,6 @@
 #include "uploader/uploaderService.h"
 #include "common/services.h"
 
-#include "ipc_event.h"
-#include "ipc_health.h"
-#include "ipc_service.h"
-#include "ipc_timer.h"
-
 #include <stdio.h>
 #include <string.h>
 
@@ -34,13 +29,13 @@ typedef struct {
     uint32_t uploaded;
     uint32_t dropped;
     uint32_t retry_ms;
-    ipc_timer_id_t retry_timer;
+    uint32_t retry_timer;   /* SVC_TIMER_NONE = khong co hen nao dang cho */
 } upload_state_t;
 
 static upload_state_t s_state = { .retry_ms = RETRY_BASE_MS,
-                                  .retry_timer = IPC_TIMER_NONE };
+                                  .retry_timer = SVC_TIMER_NONE };
 
-static void queue_push(int32_t v)
+static void queue_push(app_service_t *self, int32_t v)
 {
     if (s_state.count == QUEUE_CAP) {
         /* Tran: bo ban ghi cu nhat. Bao len health de con nhin thay - mat
@@ -48,34 +43,29 @@ static void queue_push(int32_t v)
         s_state.head = (s_state.head + 1) % QUEUE_CAP;
         s_state.count--;
         s_state.dropped++;
-        ipc_health_report(SVC_UPLOADER, EXC_QUEUE_OVERFLOW, IPC_SEV_WARN,
-                          (int32_t)s_state.dropped);
+        svc_report_warn(self, EXC_QUEUE_OVERFLOW, (int32_t)s_state.dropped);
     }
     s_state.queue[(s_state.head + s_state.count) % QUEUE_CAP] = v;
     s_state.count++;
 }
 
-static void schedule_retry(void)
+static void schedule_retry(app_service_t *self)
 {
-    if (s_state.retry_timer != IPC_TIMER_NONE)
-        ipc_timer_destroy(s_state.retry_timer);
-
-    /* Tra cuu handler theo TEN chu khong giu con tro: dich vu co the vua
-     * duoc hoi sinh voi handler khac. */
-    ipc_handler_t *self = ipc_service_get(SVC_UPLOADER);
-    if (!self) return;
-    s_state.retry_timer = ipc_timer_send_delayed(self, MSG_UPLOAD_RETRY,
-                                                 0, s_state.retry_ms);
+    /* Huy hen cu truoc khi dat hen moi, neu khong se co hai lan thu lai
+     * chong len nhau sau vai vong that bai. */
+    svc_timer_stop(self, s_state.retry_timer);
+    s_state.retry_timer = svc_timer_after(self, MSG_UPLOAD_RETRY, 0,
+                                          s_state.retry_ms);
 
     /* Thoi gian cho tang dan: mang hong ma dap cua lien tuc thi chi ton pin. */
     s_state.retry_ms *= 2;
     if (s_state.retry_ms > RETRY_MAX_MS) s_state.retry_ms = RETRY_MAX_MS;
 }
 
-static void flush(void)
+static void flush(app_service_t *self)
 {
     if (s_state.count == 0) return;
-    if (!s_state.cloud->is_online(s_state.cloud)) { schedule_retry(); return; }
+    if (!s_state.cloud->is_online(s_state.cloud)) { schedule_retry(self); return; }
 
     char payload[256];
     char name[IPC_CFG_STR_LEN];
@@ -97,14 +87,13 @@ static void flush(void)
         s_state.count -= packed;
         s_state.uploaded += packed;
         s_state.retry_ms = RETRY_BASE_MS;
-        ipc_bus_publish(TOPIC_UPLOAD_RESULT, (int32_t)packed, 1);
-        if (s_state.count > 0) flush();   /* con ton thi day tiep */
+        svc_publish_topic(self, TOPIC_UPLOAD_RESULT, (int32_t)packed, 1);
+        if (s_state.count > 0) flush(self);   /* con ton thi day tiep */
     } else {
         /* That bai: du lieu VAN nam trong hang doi, khong mat. */
-        ipc_health_report(SVC_UPLOADER, EXC_UPLOAD_FAIL, IPC_SEV_WARN,
-                          (int32_t)s_state.count);
-        ipc_bus_publish(TOPIC_UPLOAD_RESULT, (int32_t)s_state.count, 0);
-        schedule_retry();
+        svc_report_warn(self, EXC_UPLOAD_FAIL, (int32_t)s_state.count);
+        svc_publish_topic(self, TOPIC_UPLOAD_RESULT, (int32_t)s_state.count, 0);
+        schedule_retry(self);
     }
 }
 
@@ -128,14 +117,13 @@ static void uploader_on_create(app_service_t *self)
      * san, task chet khong phai ly do de vut no di.
      */
     if (s_state.cloud->is_online(s_state.cloud))
-        ipc_event_group_set(app_bits(), BIT_NET_ONLINE);
+        svc_flag_set(self, BIT_NET_ONLINE);
 }
 
 static void uploader_on_subscribe(app_service_t *self)
 {
-    (void)self;
-    ipc_bus_subscribe_service(TOPIC_DATA_READY, SVC_UPLOADER, MSG_EV_DATA_READY);
-    ipc_bus_subscribe_service(TOPIC_NET_STATE, SVC_UPLOADER, MSG_EV_NET_STATE);
+    svc_listen_topic(self, TOPIC_DATA_READY, MSG_EV_DATA_READY);
+    svc_listen_topic(self, TOPIC_NET_STATE,  MSG_EV_NET_STATE);
 }
 
 /* ---------------- xu ly tung loai message ---------------- */
@@ -143,25 +131,23 @@ static void uploader_on_subscribe(app_service_t *self)
 /* Co du lieu moi: xep vao hang doi, du lo thi day di. */
 static bool on_data_ready(app_service_t *self, ipc_message_t *msg)
 {
-    (void)self;
-    queue_push(msg->arg1);
+    queue_push(self, msg->arg1);
 
     int32_t batch = ipc_cfg_get_int(CFG_UPLOAD_BATCH, 4);
     if (batch < 1) batch = 1;
-    if (s_state.count >= (uint32_t)batch) flush();
+    if (s_state.count >= (uint32_t)batch) flush(self);
     return true;
 }
 
 /* Mang len hoac xuong. */
 static bool on_net_state(app_service_t *self, ipc_message_t *msg)
 {
-    (void)self;
     if (msg->arg1) {
-        ipc_event_group_set(app_bits(), BIT_NET_ONLINE);
+        svc_flag_set(self, BIT_NET_ONLINE);
         s_state.retry_ms = RETRY_BASE_MS;
-        flush();                   /* co mang lai thi day ngay phan ton dong */
+        flush(self);               /* co mang lai thi day ngay phan ton dong */
     } else {
-        ipc_event_group_clear(app_bits(), BIT_NET_ONLINE);
+        svc_flag_clear(self, BIT_NET_ONLINE);
     }
     return true;
 }
@@ -169,9 +155,9 @@ static bool on_net_state(app_service_t *self, ipc_message_t *msg)
 /* Den han thu lai, hoac bi thuc ep day. */
 static bool on_flush(app_service_t *self, ipc_message_t *msg)
 {
-    (void)self; (void)msg;
-    s_state.retry_timer = IPC_TIMER_NONE;
-    flush();
+    (void)msg;
+    s_state.retry_timer = SVC_TIMER_NONE;
+    flush(self);
     return true;
 }
 
@@ -199,11 +185,10 @@ static int32_t uploader_get(app_service_t *self, uint32_t key, int32_t def)
 
 static bool uploader_set(app_service_t *self, uint32_t key, int32_t value)
 {
-    (void)self;
     if (key != UPK_ONLINE) return false;
     /* Bao co mang lai la mot su kien he thong, di qua bus de ai quan tam
      * cung biet - khong sua lut trang thai ben trong. */
-    ipc_bus_publish(TOPIC_NET_STATE, value ? 1 : 0, 0);
+    svc_publish_topic(self, TOPIC_NET_STATE, value ? 1 : 0, 0);
     return true;
 }
 

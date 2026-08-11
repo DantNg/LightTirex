@@ -15,10 +15,6 @@
 #include "sensor/sensorService.h"
 #include "common/services.h"
 
-#include "ipc_event.h"
-#include "ipc_health.h"
-#include "ipc_timer.h"
-
 typedef struct {
     sensor_driver_t *drv;
     int32_t  samples;
@@ -28,24 +24,24 @@ typedef struct {
 
 static sensor_state_t s_state;
 
-static void arm_sampling_timer(void)
+static void arm_sampling_timer(app_service_t *self)
 {
     /* Huy nhip cu truoc: on_create chay lai sau moi lan hoi sinh, khong don
      * thi se co hai timer cung ban. */
-    ipc_timer_cancel_for_service(SVC_SENSOR);
+    svc_timer_stop_all(self);
 
     int32_t period = ipc_cfg_get_int(CFG_SAMPLE_PERIOD, 1000);
     if (period < 10) period = 10;   /* chan duoi: cau hinh sai khong duoc
                                      * bien thanh vong ban lien tuc */
-    ipc_timer_send_periodic_to(SVC_SENSOR, MSG_SENSOR_TICK, (uint32_t)period);
+    svc_timer_every(self, MSG_SENSOR_TICK, (uint32_t)period);
 }
 
-static void do_sample(void)
+static void do_sample(app_service_t *self)
 {
     int32_t mc = 0;
     if (s_state.drv->read(s_state.drv, &mc)) {
         s_state.fail_streak = 0;
-        ipc_bus_publish(TOPIC_SENSOR_SAMPLE, mc, s_state.samples++);
+        svc_publish_topic(self, TOPIC_SENSOR_SAMPLE, mc, s_state.samples++);
         return;
     }
 
@@ -59,8 +55,7 @@ static void do_sample(void)
      */
     s_state.fail_streak++;
     s_state.fails++;
-    ipc_health_report(SVC_SENSOR, EXC_SENSOR_READ, IPC_SEV_WARN,
-                      (int32_t)s_state.fail_streak);
+    svc_report_warn(self, EXC_SENSOR_READ, (int32_t)s_state.fail_streak);
 }
 
 /* ---------------- moc doi ---------------- */
@@ -72,14 +67,12 @@ static void sensor_on_create(app_service_t *self)
     s_state.fail_streak = 0;
     self->state = &s_state;
 
-    arm_sampling_timer();
+    arm_sampling_timer(self);
 }
 
 static void sensor_on_subscribe(app_service_t *self)
 {
-    (void)self;
-    ipc_bus_subscribe_service(TOPIC_CONFIG_CHANGED, SVC_SENSOR,
-                              MSG_EV_CONFIG_CHANGED);
+    svc_listen_topic(self, TOPIC_CONFIG_CHANGED, MSG_EV_CONFIG_CHANGED);
 }
 
 /* ---------------- xu ly tung loai message ---------------- */
@@ -87,16 +80,15 @@ static void sensor_on_subscribe(app_service_t *self)
 /* Den nhip lay mau. */
 static bool on_tick(app_service_t *self, ipc_message_t *msg)
 {
-    (void)self; (void)msg;
-    do_sample();
+    (void)msg;
+    do_sample(self);
     return true;
 }
 
 /* Cau hinh doi -> dat lai nhip. Khong can khoi dong lai dich vu. */
 static bool on_config_changed(app_service_t *self, ipc_message_t *msg)
 {
-    (void)self;
-    if (msg->arg1 == CFGK_PERIOD_MS) arm_sampling_timer();
+    if (msg->arg1 == CFGK_PERIOD_MS) arm_sampling_timer(self);
     return true;
 }
 

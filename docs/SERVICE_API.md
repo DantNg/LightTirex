@@ -51,7 +51,7 @@ nên một service không có cách nào lộ API riêng lẻ ra ngoài.
 | Móc | Khi nào chạy | Dùng để |
 |-----|--------------|---------|
 | `on_create` | trong task, mỗi lần khởi động **và mỗi lần hồi sinh** | dựng lại state, cắm driver, đặt nhịp timer |
-| `on_subscribe` | ngay sau `on_create` | `ipc_bus_subscribe_service(...)` |
+| `on_subscribe` | ngay sau `on_create` | `svc_listen_topic(self, ...)` |
 | `routes[]` | mỗi message tới | định tuyến theo `what` → hàm xử lý riêng |
 | `on_receive` | chỉ khi **không** route nào khớp | dự phòng; để `NULL` nếu không cần |
 | `on_destroy` | khi bị dừng hẳn | dọn tài nguyên ngoài (tùy chọn) |
@@ -114,6 +114,52 @@ rất khó thấy khi chạy thật. Khung làm việc đó, không ai quên đ�
   supervisor coi như treo, giết task, và message đang xử lý bị hủy. Việc dài
   thì chia nhỏ rồi tự gửi lại cho mình (`ipc_handler_send_empty(&self->handler,
   MSG_JOB_STEP)`) — vừa giữ nhịp tim, vừa để request khác xen vào.
+
+## Một cửa duy nhất ra thế giới bên ngoài
+
+Service **không gọi thẳng API lõi**. Mọi thứ đi qua các hàm `svc_*` trong
+[common/service_api.h](../services/common/service_api.h), hàm nào cũng nhận
+`self` làm tham số đầu:
+
+| Việc cần làm | Hàm | Thay cho |
+|---|---|---|
+| công bố sự kiện | `svc_publish_topic(self, topic, a1, a2)` | `ipc_bus_publish()` |
+| công bố **trạng thái** (giữ lại giá trị cuối) | `svc_publish_state(self, topic, a1, a2)` | `ipc_bus_publish_retained()` |
+| đăng ký nghe | `svc_listen_topic(self, topic, as_what)` | `ipc_bus_subscribe_service()` |
+| báo sự việc hỏng | `svc_report_warn(self, code, detail)` | `ipc_health_report()` |
+| hỏng nặng | `svc_report_error(self, code, detail)` | `ipc_health_report()` |
+| hẹn một lần | `svc_timer_after(self, what, arg1, ms)` | `ipc_timer_send_delayed()` |
+| nhịp lặp lại | `svc_timer_every(self, what, ms)` | `ipc_timer_send_periodic_to()` |
+| hủy hẹn | `svc_timer_stop(self, id)` / `svc_timer_stop_all(self)` | `ipc_timer_destroy()` |
+| cờ trạng thái | `svc_flag_set/clear(self, bits)` | `ipc_event_group_set/clear()` |
+
+Vì sao thêm một lớp mỏng như vậy:
+
+- **Danh tính không viết tay nữa.** Trước đây `sensorService` viết
+  `ipc_health_report(SVC_SENSOR, ...)`. Sao chép một hàm sang service khác mà
+  quên đổi hằng số tên → báo cáo hỏng **dưới tên người khác**, trình biên dịch
+  không báo gì. Bây giờ nguồn lấy từ `self->name`, không sai được.
+- **Đọc một file service là thấy đúng một tầng.** Trước đây mỗi service phải
+  `#include` bốn header lõi (`ipc_event.h`, `ipc_health.h`, `ipc_timer.h`,
+  `ipc_service.h`). Bây giờ chỉ `common/services.h`.
+- **Muốn thêm gì cho mọi lần công bố** — đếm, in trace, chặn vòng lặp sự kiện —
+  sửa **đúng một chỗ**: `service_api.c`.
+
+Ngoại lệ duy nhất là `healthService`: nó *chính là* nơi đặt chính sách sức khỏe
+và là cầu nối sang supervisor, nên nó được phép dùng `ipc_health.h` và
+`ipc_supervisor.h`. Các service khác chỉ báo sự việc.
+
+### Ranh giới `svc_report_*`
+
+```
+Service báo SỰ VIỆC.        "lần đọc thứ 3 liên tiếp thất bại"
+healthService quyết ĐỊNH.   "3 lần trong 10 giây → khởi động lại"
+```
+
+Service **không** tự leo thang mức độ theo số lần hỏng, **không** tự gọi
+restart. Làm cả hai nơi thì ngưỡng bị chia đôi: service đợi 3 lần mới báo
+`ERROR`, health đợi 3 `ERROR` mới xử lý → thực tế phải hỏng **9 lần**, mà đọc
+code ở cả hai file cũng không đoán ra con số đó.
 
 ## `get` / `set`
 

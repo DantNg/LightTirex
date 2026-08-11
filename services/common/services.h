@@ -13,6 +13,7 @@
 #define APP_SERVICES_H
 
 #include "common/app_events.h"
+#include "common/service_api.h"
 #include "common/service_iface.h"
 #include "drivers/drivers.h"
 

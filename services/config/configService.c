@@ -14,9 +14,6 @@
 #include "config/configService.h"
 #include "common/services.h"
 
-#include "ipc_event.h"
-#include "ipc_health.h"
-
 #include <stdio.h>
 #include <string.h>
 
@@ -62,15 +59,17 @@ static int32_t name_key(const char *name)
 /* ---------------- moc doi ---------------- */
 
 /* ipc_config goi tren context cua nguoi set. Chi cong bo (day message vao
- * hang doi), khong lam viec nang o day. */
+ * hang doi), khong lam viec nang o day.
+ * `user` la bang mo ta dich vu, dat luc ipc_cfg_init - nho vay cong bo van di
+ * qua cua chung svc_publish_topic() thay vi goi thang xuong bus. */
 static void on_cfg_write(const char *name, void *user)
 {
-    (void)user;
+    app_service_t *self = (app_service_t *)user;
     int32_t key = name_key(name);
     if (key == 0) return;
 
     s_state.changes++;
-    ipc_bus_publish(TOPIC_CONFIG_CHANGED, key, ipc_cfg_get_int(name, 0));
+    svc_publish_topic(self, TOPIC_CONFIG_CHANGED, key, ipc_cfg_get_int(name, 0));
 }
 
 static void config_on_create(app_service_t *self)
@@ -85,19 +84,19 @@ static void config_on_create(app_service_t *self)
     c.schema = k_schema;
     c.schema_count = sizeof(k_schema) / sizeof(k_schema[0]);
     c.on_change = on_cfg_write;
+    c.user = self;                  /* de callback biet no dang noi thay ai */
     c.autosave_delay_ms = 500;      /* gop nhieu lan set thanh mot lan ghi */
     c.writer_looper = self->looper; /* ghi file tren looper nay, khong nghen timer */
 
     if (ipc_cfg_init(&c) == IPC_CFG_ERR_CORRUPT)
-        ipc_health_report(SVC_CONFIG, EXC_CFG_CORRUPT, IPC_SEV_WARN, 0);
+        svc_report_warn(self, EXC_CFG_CORRUPT, 0);
 
     s_state.samples_stored = (uint32_t)ipc_cfg_get_int(CFG_SAMPLE_COUNT, 0);
 }
 
 static void config_on_subscribe(app_service_t *self)
 {
-    (void)self;
-    ipc_bus_subscribe_service(TOPIC_DATA_READY, SVC_CONFIG, MSG_EV_DATA_READY);
+    svc_listen_topic(self, TOPIC_DATA_READY, MSG_EV_DATA_READY);
 }
 
 /* ---------------- xu ly tung loai message ---------------- */

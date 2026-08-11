@@ -87,7 +87,7 @@ Chi tiết từng bước và context:
 | # | Context | Việc |
 |---|---------|------|
 | 1 | `[timer]` | timer đến hạn, phân giải `SVC_SENSOR` **theo tên** → gửi `MSG_SENSOR_TICK` |
-| 2 | `[task sensor]` | khung tra bảng định tuyến → `on_tick()` → `drv->read()` → `ipc_bus_publish(TOPIC_SENSOR_SAMPLE)` |
+| 2 | `[task sensor]` | khung tra bảng định tuyến → `on_tick()` → `drv->read()` → `svc_publish_topic(self, TOPIC_SENSOR_SAMPLE, ...)` |
 | 3 | `[task sensor]` | bus tra người nghe, `ipc_message_obtain()`, đẩy vào hàng đợi processor rồi **trả về ngay** |
 | 4 | `[task processor]` | `on_sensor_sample()` → trung bình trượt → publish `TOPIC_DATA_READY` (2 người nghe) |
 | 5 | `[task processor]` | kiểm ngưỡng; vượt thì publish `TOPIC_ALERT` |
@@ -108,11 +108,11 @@ làm nghẽn, dù uploader đang chờ mạng.
 [bất kỳ] app_service_set(SVC_CONFIG, CFGK_PERIOD_MS, 300)
    └─> ipc_cfg_set_int("sample.period_ms", 300)
          ├─> đánh dấu dirty + hẹn giờ ghi file (debounce)
-         └─> on_cfg_write() → ipc_bus_publish(TOPIC_CONFIG_CHANGED, CFGK_PERIOD_MS, 300)
+         └─> on_cfg_write() → svc_publish_topic(self, TOPIC_CONFIG_CHANGED, CFGK_PERIOD_MS, 300)
                └─> [task sensor] on_receive
-                     └─> arm_sampling_timer()
-                           ├─> ipc_timer_cancel_for_service(SVC_SENSOR)   ← hủy nhịp cũ
-                           └─> ipc_timer_send_periodic_to(..., 300)
+                     └─> arm_sampling_timer(self)
+                           ├─> svc_timer_stop_all(self)                   ← hủy nhịp cũ
+                           └─> svc_timer_every(self, MSG_SENSOR_TICK, 300)
 ```
 
 Không service nào bị khởi động lại. `configService` không biết `sensorService` tồn
@@ -144,7 +144,7 @@ Hai đường, tùy vì sao chết:
 ### 4b. Lỗi nghiệp vụ lặp lại → health quyết định
 
 ```
-[task sensor] đọc hỏng → ipc_health_report(EXC_SENSOR_READ, WARN)
+[task sensor] đọc hỏng → svc_report_warn(self, EXC_SENSOR_READ, streak)
                           → chỉ ghi vào vòng đệm, trả về ngay (gọi được từ ISR)
 [task health] ipc_health_check() mỗi 500ms:
                  rút vòng đệm → duyệt bảng luật
@@ -186,7 +186,7 @@ sau mỗi lần hồi sinh nó nhận **mọi sự kiện hai lần**. Có test 
                       dữ liệu VẪN nằm trong hàng đợi
 
 hàng đợi đầy (16 bản ghi):
-                  └─> bỏ bản ghi CŨ NHẤT + ipc_health_report(EXC_QUEUE_OVERFLOW)
+                  └─> bỏ bản ghi CŨ NHẤT + svc_report_warn(self, EXC_QUEUE_OVERFLOW, n)
                       (trong đo lường, dữ liệu mới có giá trị hơn dữ liệu cũ)
 
 có mạng lại:

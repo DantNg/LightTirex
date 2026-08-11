@@ -26,7 +26,8 @@ không biết chạy trên FreeRTOS hay desktop.
 core/include/       API công khai của framework (ipc_*.h)
 core/src/           hiện thực
 port/               port_freertos.c, port_host.c, wdt_backend_esp32.c
-services/common/     app_events.h (bản hợp đồng), service_iface.h/.c (khung), services.h
+services/common/     app_events.h (bản hợp đồng), service_iface.h/.c (khung),
+                     service_api.h/.c (một cửa ra API lõi), services.h
 services/drivers/    cảm biến và server mock, đều sau interface
 services/sensor/     sensorService.h/.c
 services/processor/  processorService.h/.c
