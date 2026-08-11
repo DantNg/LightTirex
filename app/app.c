@@ -175,11 +175,13 @@ void app_dump(void (*print)(const char *line))
     for (size_t i = 0; i < SERVICE_COUNT; ++i) {
         app_service_t *svc = k_services[i]();
         snprintf(line, sizeof(line),
-                 "svc %-10s state=%d gen=%u restarts=%u pending=%u",
+                 "svc %-10s state=%d gen=%u restarts=%u pending=%u "
+                 "handled=%u unhandled=%u",
                  svc->name, (int)ipc_looper_state(svc->looper),
                  (unsigned)ipc_looper_generation(svc->looper),
                  (unsigned)ipc_looper_restart_count(svc->looper),
-                 (unsigned)ipc_looper_pending(svc->looper));
+                 (unsigned)ipc_looper_pending(svc->looper),
+                 (unsigned)svc->handled, (unsigned)svc->unhandled);
         print(line);
     }
     snprintf(line, sizeof(line), "bits=0x%02x",

@@ -114,16 +114,20 @@ static void health_on_subscribe(app_service_t *self)
     ipc_bus_subscribe_service(TOPIC_ALERT, SVC_HEALTH, MSG_EV_ALERT);
 }
 
-static bool health_on_receive(app_service_t *self, ipc_message_t *msg)
+/* ---------------- xu ly tung loai message ---------------- */
+
+/* Canh bao nguong khong phai loi he thong: dem lai de nhin xu huong,
+ * khong khoi dong lai ai ca. */
+static bool on_alert(app_service_t *self, ipc_message_t *msg)
 {
-    (void)self;
-    if (msg->what == MSG_EV_ALERT) {
-        /* Canh bao nguong khong phai loi he thong: dem lai de nhin xu huong,
-         * khong khoi dong lai ai ca. */
-        s_state.alerts_seen++;
-    }
+    (void)self; (void)msg;
+    s_state.alerts_seen++;
     return true;
 }
+
+static const svc_route_t k_routes[] = {
+    { MSG_EV_ALERT, on_alert, "alert" },
+};
 
 /* ---------------- doc/ghi tham so ---------------- */
 
@@ -155,7 +159,8 @@ static app_service_t s_svc = {
     .ready_bit = BIT_HEALTH_READY,
     .on_create = health_on_create,
     .on_subscribe = health_on_subscribe,
-    .on_receive = health_on_receive,
+    .routes = k_routes,
+    .route_count = sizeof(k_routes) / sizeof(k_routes[0]),
     .get = health_get,
     .set = health_set,
 };

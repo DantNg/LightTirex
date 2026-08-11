@@ -80,7 +80,8 @@ static service_factory_fn const k_services[] = {
 ```
 
 Mỗi service khai báo một bảng `app_service_t` với móc đời thống nhất
-(`on_create` / `on_subscribe` / `on_receive`) và một cặp `get`/`set` chung —
+(`on_create` / `on_subscribe` / bảng định tuyến `routes[]`) và một cặp
+`get`/`set` chung —
 xem [SERVICE_API.md](docs/SERVICE_API.md).
 
 ```c
@@ -106,12 +107,12 @@ Chi tiết từng đường chết và cái gì sống sót qua hồi sinh:
 
 ## Test
 
-**60 test** chạy trên desktop với thời gian ảo, đơn luồng, không `sleep()`,
+**61 test** chạy trên desktop với thời gian ảo, đơn luồng, không `sleep()`,
 không thread, không phần cứng — hết trong vài mili giây và không bao giờ flaky.
 
 ```
 tests/unit/       timer (11), watchdog (6), config (9), health (11), bus (12)
-tests/behavior/   hành vi cả hệ thống (11)
+tests/behavior/   hành vi cả hệ thống (12)
 ```
 
 Nhóm `behavior/` mô tả tình huống có thật chứ không test từng hàm: *"mất mạng

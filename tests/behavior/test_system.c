@@ -257,6 +257,35 @@ static void test_cam_bien_hong_lien_tuc_thi_health_khoi_dong_lai(void)
 }
 
 /*
+ * Bang dinh tuyen: moi loai message di den dung ham cua no, va message
+ * khong ai nhan thi phai duoc DEM chu khong bi nuot im lang - message la
+ * gan nhu luon la dau hieu dang ky bus sai ma `what`.
+ */
+static void test_message_khong_ai_nhan_thi_duoc_dem(void)
+{
+    tick(1000);
+    app_service_t *svc = app_service_find(SVC_PROCESSOR);
+    CHECK(svc != NULL);
+    CHECK(svc->route_count > 0);
+
+    uint32_t handled_before = svc->handled;
+    uint32_t unhandled_before = svc->unhandled;
+
+    /* Ma `what` khong co trong bang dinh tuyen cua processor. */
+    ipc_handler_t *h = ipc_service_get(SVC_PROCESSOR);
+    CHECK(h != NULL);
+    ipc_handler_send_empty(h, 0xDEAD);
+    app_poll_all();
+
+    CHECK_EQ(svc->unhandled, unhandled_before + 1);
+    CHECK_EQ(svc->handled, handled_before);   /* khong tinh la da xu ly */
+
+    /* Message dung dia chi van chay binh thuong. */
+    tick(1000);
+    CHECK(svc->handled > handled_before);
+}
+
+/*
  * Kich ban: health quyet dinh giet han mot dich vu (khong hoi sinh).
  * Yeu cau: dich vu do bien mat khoi ServiceManager, nhung phan con lai cua
  * he thong van chay binh thuong.
@@ -325,6 +354,7 @@ void run_system_tests(void)
     RUN_TEST(test_processor_chet_roi_hoi_sinh_khong_xu_ly_trung);
     RUN_TEST(test_uploader_chet_thi_du_lieu_cho_van_con);
     RUN_TEST(test_cam_bien_hong_lien_tuc_thi_health_khoi_dong_lai);
+    RUN_TEST(test_message_khong_ai_nhan_thi_duoc_dem);
     RUN_TEST(test_giet_han_mot_dich_vu_phan_con_lai_van_chay);
 
     app_stop();

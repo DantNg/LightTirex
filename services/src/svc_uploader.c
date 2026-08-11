@@ -137,39 +137,49 @@ static void uploader_on_subscribe(app_service_t *self)
     ipc_bus_subscribe_service(TOPIC_NET_STATE, SVC_UPLOADER, MSG_EV_NET_STATE);
 }
 
-static bool uploader_on_receive(app_service_t *self, ipc_message_t *msg)
+/* ---------------- xu ly tung loai message ---------------- */
+
+/* Co du lieu moi: xep vao hang doi, du lo thi day di. */
+static bool on_data_ready(app_service_t *self, ipc_message_t *msg)
 {
     (void)self;
-    switch (msg->what) {
-    case MSG_EV_DATA_READY: {
-        queue_push(msg->arg1);
-        int32_t batch = ipc_cfg_get_int(CFG_UPLOAD_BATCH, 4);
-        if (batch < 1) batch = 1;
-        if (s_state.count >= (uint32_t)batch) flush();
-        break;
-    }
+    queue_push(msg->arg1);
 
-    case MSG_EV_NET_STATE:
-        if (msg->arg1) {
-            ipc_event_group_set(app_bits(), BIT_NET_ONLINE);
-            s_state.retry_ms = RETRY_BASE_MS;
-            flush();               /* co mang lai thi day ngay phan ton dong */
-        } else {
-            ipc_event_group_clear(app_bits(), BIT_NET_ONLINE);
-        }
-        break;
+    int32_t batch = ipc_cfg_get_int(CFG_UPLOAD_BATCH, 4);
+    if (batch < 1) batch = 1;
+    if (s_state.count >= (uint32_t)batch) flush();
+    return true;
+}
 
-    case MSG_UPLOAD_RETRY:
-    case MSG_UPLOAD_FLUSH:
-        s_state.retry_timer = IPC_TIMER_NONE;
-        flush();
-        break;
-
-    default:
-        break;
+/* Mang len hoac xuong. */
+static bool on_net_state(app_service_t *self, ipc_message_t *msg)
+{
+    (void)self;
+    if (msg->arg1) {
+        ipc_event_group_set(app_bits(), BIT_NET_ONLINE);
+        s_state.retry_ms = RETRY_BASE_MS;
+        flush();                   /* co mang lai thi day ngay phan ton dong */
+    } else {
+        ipc_event_group_clear(app_bits(), BIT_NET_ONLINE);
     }
     return true;
 }
+
+/* Den han thu lai, hoac bi thuc ep day. */
+static bool on_flush(app_service_t *self, ipc_message_t *msg)
+{
+    (void)self; (void)msg;
+    s_state.retry_timer = IPC_TIMER_NONE;
+    flush();
+    return true;
+}
+
+static const svc_route_t k_routes[] = {
+    { MSG_EV_DATA_READY, on_data_ready, "data_ready" },
+    { MSG_EV_NET_STATE,  on_net_state,  "net_state"  },
+    { MSG_UPLOAD_RETRY,  on_flush,      "retry"      },
+    { MSG_UPLOAD_FLUSH,  on_flush,      "flush"      },
+};
 
 /* ---------------- doc/ghi tham so ---------------- */
 
@@ -205,7 +215,8 @@ static app_service_t s_svc = {
     .ready_bit = BIT_UPLOADER_READY,
     .on_create = uploader_on_create,
     .on_subscribe = uploader_on_subscribe,
-    .on_receive = uploader_on_receive,
+    .routes = k_routes,
+    .route_count = sizeof(k_routes) / sizeof(k_routes[0]),
     .get = uploader_get,
     .set = uploader_set,
 };

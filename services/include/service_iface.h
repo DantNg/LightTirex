@@ -46,6 +46,27 @@ typedef struct app_service app_service_t;
  * "gia tri that su bang 0". */
 #define SVC_VALUE_INVALID INT32_MIN
 
+/*
+ * Mot ham xu ly cho MOT loai message. Tra true neu da xu ly xong.
+ */
+typedef bool (*svc_handler_fn)(app_service_t *self, ipc_message_t *msg);
+
+/*
+ * Bang dinh tuyen: message nao thi ai xu ly.
+ *
+ * Thay cho mot switch dai trong on_receive. Loi ich khong chi la tham my:
+ *   - moi ham lam mot viec, ten ham noi ro no lam gi
+ *   - nhin bang la biet dich vu nay nhan nhung gi, khong phai doc het than ham
+ *   - them mot loai message = them mot dong, khong sua ham dang co
+ *   - khung dem duoc message khong ai nhan (thuong la dau hieu dang ky sai
+ *     ma `what`), thay vi nuot im lang
+ */
+typedef struct {
+    uint32_t       what;
+    svc_handler_fn fn;
+    const char    *name;   /* de debug/trace, khong bat buoc */
+} svc_route_t;
+
 struct app_service {
     /* ---- khai bao (dich vu dien luc bien dich) ---- */
     const char *name;              /* trung voi ten dang ky ServiceManager */
@@ -64,7 +85,15 @@ struct app_service {
     /* Dang ky nghe bus o day. Khung da huy dang ky cu truoc khi goi. */
     void (*on_subscribe)(app_service_t *self);
 
-    /* Xu ly mot message. Tra true neu da xu ly xong. */
+    /* Bang dinh tuyen message -> ham xu ly. Day la cach chinh. */
+    const svc_route_t *routes;
+    uint32_t           route_count;
+
+    /*
+     * Du phong: chi chay khi KHONG route nao khop. De NULL neu dich vu chi
+     * nhan dung nhung gi da khai bao trong bang - khi do message la se duoc
+     * dem vao `unhandled` thay vi bi nuot.
+     */
     bool (*on_receive)(app_service_t *self, ipc_message_t *msg);
 
     /* Goi khi dich vu bi dung han (health quyet dinh giet). Co the NULL. */
@@ -82,6 +111,8 @@ struct app_service {
     ipc_handler_t handler;
     void         *state;           /* tro toi state rieng cua dich vu */
     void         *ctx;             /* cau hinh ung dung (app_cfg_t) */
+    uint32_t      handled;         /* so message da co nguoi xu ly */
+    uint32_t      unhandled;       /* khong route nao khop va khong co on_receive */
 };
 
 /*

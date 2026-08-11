@@ -81,23 +81,28 @@ static void sensor_on_subscribe(app_service_t *self)
                               MSG_EV_CONFIG_CHANGED);
 }
 
-static bool sensor_on_receive(app_service_t *self, ipc_message_t *msg)
+/* ---------------- xu ly tung loai message ---------------- */
+
+/* Den nhip lay mau. */
+static bool on_tick(app_service_t *self, ipc_message_t *msg)
 {
-    (void)self;
-    switch (msg->what) {
-    case MSG_SENSOR_TICK:
-        do_sample();
-        break;
-
-    case MSG_EV_CONFIG_CHANGED:
-        if (msg->arg1 == CFGK_PERIOD_MS) arm_sampling_timer();
-        break;
-
-    default:
-        break;
-    }
+    (void)self; (void)msg;
+    do_sample();
     return true;
 }
+
+/* Cau hinh doi -> dat lai nhip. Khong can khoi dong lai dich vu. */
+static bool on_config_changed(app_service_t *self, ipc_message_t *msg)
+{
+    (void)self;
+    if (msg->arg1 == CFGK_PERIOD_MS) arm_sampling_timer();
+    return true;
+}
+
+static const svc_route_t k_routes[] = {
+    { MSG_SENSOR_TICK,       on_tick,           "tick"           },
+    { MSG_EV_CONFIG_CHANGED, on_config_changed, "config_changed" },
+};
 
 /* ---------------- doc/ghi tham so ---------------- */
 
@@ -129,7 +134,8 @@ static app_service_t s_svc = {
     .ready_bit = BIT_SENSOR_READY,
     .on_create = sensor_on_create,
     .on_subscribe = sensor_on_subscribe,
-    .on_receive = sensor_on_receive,
+    .routes = k_routes,
+    .route_count = sizeof(k_routes) / sizeof(k_routes[0]),
     .get = sensor_get,
     .set = sensor_set,
 };

@@ -29,13 +29,31 @@ app_service_t *app_service_find(const char *name)
     return NULL;
 }
 
-/* Mot cua duy nhat cho moi message cua moi dich vu. */
+/*
+ * Mot cua duy nhat cho moi message cua moi dich vu.
+ *
+ * Thu tu: bang dinh tuyen truoc, on_receive la du phong. Khong khop cai nao
+ * thi DEM lai chu khong nuot im lang - message khong ai nhan gan nhu luon la
+ * dau hieu dang ky bus sai ma `what`.
+ */
 static bool service_dispatch(ipc_handler_t *h, ipc_message_t *msg, void *user)
 {
     app_service_t *svc = (app_service_t *)user;
     (void)h;
-    if (!svc || !svc->on_receive) return true;
-    return svc->on_receive(svc, msg);
+    if (!svc) return true;
+
+    for (uint32_t i = 0; i < svc->route_count; ++i) {
+        if (svc->routes[i].what == msg->what) {
+            svc->handled++;
+            return svc->routes[i].fn(svc, msg);
+        }
+    }
+    if (svc->on_receive) {
+        svc->handled++;
+        return svc->on_receive(svc, msg);
+    }
+    svc->unhandled++;
+    return true;
 }
 
 /*

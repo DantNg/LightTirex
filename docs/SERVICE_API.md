@@ -17,8 +17,11 @@ static app_service_t s_svc = {
     /* móc đời */
     .on_create    = sensor_on_create,        // khởi tạo lại state, cắm driver
     .on_subscribe = sensor_on_subscribe,     // đăng ký nghe bus
-    .on_receive   = sensor_on_receive,       // xử lý message
     .on_destroy   = NULL,                    // tùy chọn
+
+    /* bảng định tuyến: message nào thì ai xử lý */
+    .routes       = k_routes,
+    .route_count  = sizeof(k_routes) / sizeof(k_routes[0]),
 
     /* đọc/ghi tham số */
     .get = sensor_get,
@@ -38,8 +41,41 @@ Thêm service mới = viết một file theo khuôn này, khai báo `svc_xxx()` 
 |-----|--------------|---------|
 | `on_create` | trong task, mỗi lần khởi động **và mỗi lần hồi sinh** | dựng lại state, cắm driver, đặt nhịp timer |
 | `on_subscribe` | ngay sau `on_create` | `ipc_bus_subscribe_service(...)` |
-| `on_receive` | mỗi message tới | xử lý; trả `true` nếu đã xong |
+| `routes[]` | mỗi message tới | định tuyến theo `what` → hàm xử lý riêng |
+| `on_receive` | chỉ khi **không** route nào khớp | dự phòng; để `NULL` nếu không cần |
 | `on_destroy` | khi bị dừng hẳn | dọn tài nguyên ngoài (tùy chọn) |
+
+## Bảng định tuyến
+
+Thay cho một `switch` dài, mỗi loại message có một hàm riêng có tên nói rõ nó
+làm gì:
+
+```c
+static bool on_data_ready(app_service_t *self, ipc_message_t *msg) {
+    queue_push(msg->arg1);
+    if (du_lo()) flush();
+    return true;
+}
+
+static const svc_route_t k_routes[] = {
+    { MSG_EV_DATA_READY, on_data_ready, "data_ready" },
+    { MSG_EV_NET_STATE,  on_net_state,  "net_state"  },
+    { MSG_UPLOAD_RETRY,  on_flush,      "retry"      },
+    { MSG_UPLOAD_FLUSH,  on_flush,      "flush"      },
+};
+```
+
+Lợi ích không chỉ là thẩm mỹ:
+
+- Nhìn bảng là biết service này nhận những gì — không phải đọc hết thân hàm.
+- Thêm một loại message = thêm một dòng, không sửa hàm đang có.
+- **Message không ai nhận được đếm vào `svc->unhandled`** thay vì bị nuốt im
+  lặng. Message lạ gần như luôn là dấu hiệu đăng ký bus sai mã `what` — trước
+  đây nhánh `default:` của `switch` nuốt nó và lỗi này rất khó thấy. Xem
+  `app_dump()` để đọc `handled`/`unhandled` từng service.
+
+`on_receive` vẫn còn, nhưng chỉ chạy khi không route nào khớp. Để `NULL` nếu
+service chỉ nhận đúng những gì đã khai báo.
 
 ### Khung làm gì trước khi gọi bạn
 
@@ -63,8 +99,10 @@ rất khó thấy khi chạy thật. Khung làm việc đó, không ai quên đ�
   hồi sinh. State nào cần giữ qua chu kỳ chết/sống thì để ở biến `static`
   ngoài, đừng khởi tạo lại trong này (ví dụ: hàng đợi chưa đẩy của uploader,
   cửa sổ lọc của processor).
-- **`on_receive` không được block lâu.** Vượt `heartbeat_timeout_ms` thì
-  supervisor coi như treo và giết task.
+- **Hàm xử lý không được block lâu.** Vượt `heartbeat_timeout_ms` thì
+  supervisor coi như treo, giết task, và message đang xử lý bị hủy. Việc dài
+  thì chia nhỏ rồi tự gửi lại cho mình (`ipc_handler_send_empty(&self->handler,
+  MSG_JOB_STEP)`) — vừa giữ nhịp tim, vừa để request khác xen vào.
 
 ## `get` / `set`
 

@@ -70,17 +70,21 @@ static void processor_on_subscribe(app_service_t *self)
                               MSG_EV_SENSOR_SAMPLE);
 }
 
-static bool processor_on_receive(app_service_t *self, ipc_message_t *msg)
+/* ---------------- xu ly tung loai message ---------------- */
+
+static bool on_sensor_sample(app_service_t *self, ipc_message_t *msg)
 {
     (void)self;
-    if (msg->what != MSG_EV_SENSOR_SAMPLE) return true;
-
     s_state.last_avg = push_and_average(msg->arg1);
     s_state.processed++;
     ipc_bus_publish(TOPIC_DATA_READY, s_state.last_avg, (int32_t)s_state.processed);
     check_thresholds(s_state.last_avg);
     return true;
 }
+
+static const svc_route_t k_routes[] = {
+    { MSG_EV_SENSOR_SAMPLE, on_sensor_sample, "sensor_sample" },
+};
 
 /* ---------------- doc/ghi tham so ---------------- */
 
@@ -110,7 +114,8 @@ static app_service_t s_svc = {
     .ready_bit = BIT_PROCESSOR_READY,
     .on_create = processor_on_create,
     .on_subscribe = processor_on_subscribe,
-    .on_receive = processor_on_receive,
+    .routes = k_routes,
+    .route_count = sizeof(k_routes) / sizeof(k_routes[0]),
     .get = processor_get,
     .set = processor_set,
 };

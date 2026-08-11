@@ -87,12 +87,12 @@ Chi tiết từng bước và context:
 | # | Context | Việc |
 |---|---------|------|
 | 1 | `[timer]` | timer đến hạn, phân giải `SVC_SENSOR` **theo tên** → gửi `MSG_SENSOR_TICK` |
-| 2 | `[task sensor]` | `on_receive` → `drv->read()` → `ipc_bus_publish(TOPIC_SENSOR_SAMPLE)` |
+| 2 | `[task sensor]` | khung tra bảng định tuyến → `on_tick()` → `drv->read()` → `ipc_bus_publish(TOPIC_SENSOR_SAMPLE)` |
 | 3 | `[task sensor]` | bus tra người nghe, `ipc_message_obtain()`, đẩy vào hàng đợi processor rồi **trả về ngay** |
-| 4 | `[task processor]` | `on_receive` → trung bình trượt → publish `TOPIC_DATA_READY` (2 người nghe) |
+| 4 | `[task processor]` | `on_sensor_sample()` → trung bình trượt → publish `TOPIC_DATA_READY` (2 người nghe) |
 | 5 | `[task processor]` | kiểm ngưỡng; vượt thì publish `TOPIC_ALERT` |
 | 6 | `[task config]` | lưu `LAST_VALUE`; **không ghi file ngay** — debounce 500ms |
-| 7 | `[task uploader]` | đẩy vào hàng đợi; đủ `upload.batch` thì `flush()` |
+| 7 | `[task uploader]` | `on_data_ready()` → đẩy vào hàng đợi; đủ `upload.batch` thì `flush()` |
 | 8 | `[timer]` | 500ms sau lần set cuối: gửi `CFG_MSG_SAVE` tới looper config |
 | 9 | `[task config]` | ghi file: bản tạm → `rename()` |
 

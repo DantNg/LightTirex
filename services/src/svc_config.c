@@ -99,17 +99,22 @@ static void config_on_subscribe(app_service_t *self)
     ipc_bus_subscribe_service(TOPIC_DATA_READY, SVC_CONFIG, MSG_EV_DATA_READY);
 }
 
-static bool config_on_receive(app_service_t *self, ipc_message_t *msg)
+/* ---------------- xu ly tung loai message ---------------- */
+
+/* Co du lieu moi -> luu gia tri moi nhat, de sau khi mat dien con biet
+ * lan cuoi doc duoc gi. Khong ghi file ngay: ipc_config gop lai. */
+static bool on_data_ready(app_service_t *self, ipc_message_t *msg)
 {
     (void)self;
-    if (msg->what == MSG_EV_DATA_READY) {
-        /* Luu gia tri moi nhat de sau khi mat dien con biet lan cuoi doc gi. */
-        ipc_cfg_set_int(CFG_LAST_VALUE, msg->arg1);
-        s_state.samples_stored++;
-        ipc_cfg_set_int(CFG_SAMPLE_COUNT, (int32_t)s_state.samples_stored);
-    }
+    ipc_cfg_set_int(CFG_LAST_VALUE, msg->arg1);
+    s_state.samples_stored++;
+    ipc_cfg_set_int(CFG_SAMPLE_COUNT, (int32_t)s_state.samples_stored);
     return true;
 }
+
+static const svc_route_t k_routes[] = {
+    { MSG_EV_DATA_READY, on_data_ready, "data_ready" },
+};
 
 /* ---------------- doc/ghi tham so ---------------- */
 
@@ -139,7 +144,8 @@ static app_service_t s_svc = {
     .ready_bit = BIT_CONFIG_READY,
     .on_create = config_on_create,
     .on_subscribe = config_on_subscribe,
-    .on_receive = config_on_receive,
+    .routes = k_routes,
+    .route_count = sizeof(k_routes) / sizeof(k_routes[0]),
     .get = config_get,
     .set = config_set,
 };
