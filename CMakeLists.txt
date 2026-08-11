@@ -1,55 +1,55 @@
-# Dung nhu mot component ESP-IDF:
-#   idf_component_register(...) duoc goi khi bien duoi ESP-IDF.
-# Ngoai ESP-IDF, add_subdirectory() file nay se tao static library lightTirex.
+# lightTirex
+#
+#   core/      framework doc lap nen tang
+#   port/      lop nen tang (FreeRTOS / desktop)
+#   services/  cac dich vu cua ung dung IoT
+#   app/       lap rap + diem vao
+#   tests/     test chay tren desktop
+#
+# Duoi ESP-IDF: dat thu muc nay lam component.
+# Ngoai ESP-IDF: cmake -B build && cmake --build build && ctest --test-dir build
 
-set(LIGHTTIREX_CORE
-    src/ipc_message.c
-    src/ipc_clock.c
-    src/ipc_looper.c
-    src/ipc_service.c
-    src/ipc_supervisor.c
-    src/ipc_timer.c
-    src/ipc_watchdog.c
-    src/ipc_health.c
-    src/ipc_config.c
-    src/ipc_event.c
-    src/ipc_event_group.c
-)
-
-set(LIGHTTIREX_SERVICES
-    services/app.c
-    services/drivers.c
-    services/svc_config.c
-    services/svc_sensor.c
-    services/svc_processor.c
-    services/svc_uploader.c
-    services/svc_health.c
-)
+file(GLOB LIGHTTIREX_CORE     "${CMAKE_CURRENT_LIST_DIR}/core/src/*.c")
+file(GLOB LIGHTTIREX_SERVICES "${CMAKE_CURRENT_LIST_DIR}/services/src/*.c")
 
 if(DEFINED ENV{IDF_PATH})
     idf_component_register(
         SRCS ${LIGHTTIREX_CORE} ${LIGHTTIREX_SERVICES}
-             "src/port_freertos.c" "src/wdt_backend_esp32.c"
-        INCLUDE_DIRS "include" "services"
+             "app/app.c" "app/main.c"
+             "port/port_freertos.c" "port/wdt_backend_esp32.c"
+        INCLUDE_DIRS "core/include" "services/include" "app"
         REQUIRES freertos esp_system esp_timer
     )
 else()
-    # Build host: thu vien + test chay tren PC.
     cmake_minimum_required(VERSION 3.13)
     project(lightTirex C)
     set(CMAKE_C_STANDARD 11)
-
-    add_library(lightTirex STATIC ${LIGHTTIREX_CORE} ${LIGHTTIREX_SERVICES} src/port_host.c)
-    target_include_directories(lightTirex PUBLIC include services)
-    target_compile_definitions(lightTirex PUBLIC IPC_PORT_HOST)
     find_package(Threads REQUIRED)
+
+    add_library(lightTirex STATIC
+        ${LIGHTTIREX_CORE} ${LIGHTTIREX_SERVICES}
+        app/app.c
+        port/port_host.c
+    )
+    target_include_directories(lightTirex PUBLIC core/include services/include app)
+    target_compile_definitions(lightTirex PUBLIC IPC_PORT_HOST)
     target_link_libraries(lightTirex PUBLIC Threads::Threads)
 
+    # He IoT chay that voi task that.
+    add_executable(app_demo app/main.c)
+    target_link_libraries(app_demo PRIVATE lightTirex)
+
+    # Vi du dung truc tiep looper/supervisor, khong qua lop services.
+    add_executable(basic_ipc examples/basic_ipc/main.c)
+    target_link_libraries(basic_ipc PRIVATE lightTirex)
+
     enable_testing()
-    add_executable(ipc_tests test/test_main.c test/test_timer.c test/test_watchdog.c
-                          test/test_config.c test/test_health.c
-                          test/test_bus.c test/test_system.c)
-    target_include_directories(ipc_tests PRIVATE test)
+    file(GLOB LIGHTTIREX_TESTS
+        "${CMAKE_CURRENT_LIST_DIR}/tests/unit/*.c"
+        "${CMAKE_CURRENT_LIST_DIR}/tests/behavior/*.c"
+        "${CMAKE_CURRENT_LIST_DIR}/tests/support/*.c")
+    add_executable(ipc_tests ${LIGHTTIREX_TESTS})
+    target_include_directories(ipc_tests PRIVATE tests/support)
     target_link_libraries(ipc_tests PRIVATE lightTirex)
     add_test(NAME ipc_tests COMMAND ipc_tests)
 endif()

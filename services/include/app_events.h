@@ -72,6 +72,45 @@ enum {
     MSG_PERSIST,
 };
 
+/* ---------------- khoa doc/ghi cua tung dich vu ----------------
+ *
+ * Dung voi svc->get()/svc->set(), hoac duong tat app_service_get/set().
+ * Moi dich vu co khong gian khoa rieng, bat dau tu 1.
+ */
+
+enum {                        /* SVC_CONFIG */
+    CFGK_PERIOD_MS = 1,
+    CFGK_UPLOAD_BATCH_N,
+    CFGK_ALERT_HIGH,
+    CFGK_ALERT_LOW,
+    CFGK_LAST_VALUE,
+    CFGK_CHANGE_COUNT,        /* chi doc */
+};
+
+enum {                        /* SVC_SENSOR */
+    SENSORK_SAMPLES = 1,      /* chi doc: so mau da doc duoc */
+    SENSORK_FAILS,            /* chi doc: so lan doc hong */
+    SENSORK_FAIL_STREAK,      /* chi doc: so lan hong lien tiep hien tai */
+};
+
+enum {                        /* SVC_PROCESSOR */
+    PROCK_LAST_AVG = 1,       /* chi doc */
+    PROCK_ALERTS,             /* chi doc */
+    PROCK_PROCESSED,          /* chi doc */
+};
+
+enum {                        /* SVC_UPLOADER */
+    UPK_PENDING = 1,          /* chi doc: so ban ghi dang cho day */
+    UPK_UPLOADED,             /* chi doc: tong da day thanh cong */
+    UPK_DROPPED,              /* chi doc: mat do hang doi tran */
+    UPK_ONLINE,               /* doc/ghi: 1 = coi nhu co mang */
+};
+
+enum {                        /* SVC_HEALTH */
+    HEALTHK_DEGRADED = 1,     /* chi doc: 1 = dang co van de */
+    HEALTHK_ALERTS,           /* chi doc: so canh bao nguong da thay */
+};
+
 /* ---------------- khoa cau hinh (ten trong file) ---------------- */
 
 #define CFG_SAMPLE_PERIOD "sample.period_ms"

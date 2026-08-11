@@ -14,6 +14,7 @@
 #include "ipc_watchdog.h"
 #include "ipc_health.h"
 #include "ipc_config.h"
+#include "ipc_port.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -278,4 +279,11 @@ void ipc_demo_start(void)
 
 #ifdef ESP_PLATFORM
 void app_main(void) { ipc_demo_start(); }
+#else
+int main(void)
+{
+    ipc_demo_start();
+    ipc_sleep_ms(15000);   /* de cac task chay mot lat roi thoat */
+    return 0;
+}
 #endif

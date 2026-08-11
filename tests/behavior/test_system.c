@@ -19,6 +19,7 @@
 #include "ipc_health.h"
 #include "ipc_service.h"
 #include "ipc_timer.h"
+#include "app.h"
 #include "services.h"
 
 static ipc_fake_clock_t      g_clock;
@@ -52,31 +53,31 @@ static void tick_n(uint32_t times, uint32_t ms)
 static void test_mau_cam_bien_chay_het_duong_ong(void)
 {
     g_sensor.value_mc = 25000;
-    int32_t before = svc_sensor_peek_samples();
+    int32_t before = app_service_get(SVC_SENSOR, SENSORK_SAMPLES, 0);
 
     tick(1000);   /* dung mot chu ky lay mau */
 
     /* sensor da doc */
-    CHECK_EQ(svc_sensor_peek_samples(), before + 1);
+    CHECK_EQ(app_service_get(SVC_SENSOR, SENSORK_SAMPLES, 0), before + 1);
     /* processor da loc va cong bo */
-    CHECK_EQ(svc_processor_peek_avg(), 25000);
+    CHECK_EQ(app_service_get(SVC_PROCESSOR, PROCK_LAST_AVG, 0), 25000);
     /* config da luu gia tri moi nhat xuong (file gia trong RAM) */
-    CHECK_EQ(ipc_cfg_get_int(CFG_LAST_VALUE, 0), 25000);
+    CHECK_EQ(app_service_get(SVC_CONFIG, CFGK_LAST_VALUE, 0), 25000);
     /* uploader da nhan va dang gom lo */
-    CHECK(svc_uploader_peek_pending() > 0 || svc_uploader_peek_uploaded() > 0);
+    CHECK((uint32_t)app_service_get(SVC_UPLOADER, UPK_PENDING, 0) > 0 || (uint32_t)app_service_get(SVC_UPLOADER, UPK_UPLOADED, 0) > 0);
 }
 
 /* Day het phan ton dong de test sau bat dau tu hang doi rong. */
 static void drain(void)
 {
-    for (int i = 0; i < 20 && svc_uploader_peek_pending() > 0; ++i) tick(1000);
+    for (int i = 0; i < 20 && (uint32_t)app_service_get(SVC_UPLOADER, UPK_PENDING, 0) > 0; ++i) tick(1000);
 }
 
 static void test_day_len_server_khi_du_lo(void)
 {
     drain();
     uint32_t uploads_before = g_cloud.upload_count;
-    int32_t batch = ipc_cfg_get_int(CFG_UPLOAD_BATCH, 4);
+    int32_t batch = app_service_get(SVC_CONFIG, CFGK_UPLOAD_BATCH_N, 4);
 
     /* Chua du lo thi chua duoc day - gom lo la de do so lan bat song. */
     tick_n((uint32_t)batch - 1, 1000);
@@ -84,7 +85,7 @@ static void test_day_len_server_khi_du_lo(void)
 
     tick(1000);   /* mau lam day lo */
     CHECK_EQ(g_cloud.upload_count, uploads_before + 1);
-    CHECK_EQ(svc_uploader_peek_pending(), 0);
+    CHECK_EQ((uint32_t)app_service_get(SVC_UPLOADER, UPK_PENDING, 0), 0);
     CHECK(g_cloud.records_received > 0);
 }
 
@@ -92,36 +93,36 @@ static void test_day_len_server_khi_du_lo(void)
 static void test_doi_cau_hinh_thi_sensor_doi_nhip_lay_mau(void)
 {
     tick(1000);
-    int32_t before = svc_sensor_peek_samples();
+    int32_t before = app_service_get(SVC_SENSOR, SENSORK_SAMPLES, 0);
 
-    ipc_cfg_set_int(CFG_SAMPLE_PERIOD, 200);   /* nhanh gap 5 lan */
+    app_service_set(SVC_CONFIG, CFGK_PERIOD_MS, 200);   /* nhanh gap 5 lan */
     app_poll_all();                            /* su kien config lan toi sensor */
 
     tick_n(10, 100);                           /* 1000ms voi buoc 100ms */
-    int32_t after = svc_sensor_peek_samples();
+    int32_t after = app_service_get(SVC_SENSOR, SENSORK_SAMPLES, 0);
 
     /* 1000ms / 200ms = 5 mau. Cho phep lech 1 do lam tron bien. */
     CHECK(after - before >= 4);
     CHECK(after - before <= 6);
 
-    ipc_cfg_set_int(CFG_SAMPLE_PERIOD, 1000);  /* tra lai cho cac test sau */
+    app_service_set(SVC_CONFIG, CFGK_PERIOD_MS, 1000);  /* tra lai cho cac test sau */
     app_poll_all();
     tick(1000);
 }
 
 static void test_vuot_nguong_thi_co_canh_bao(void)
 {
-    uint32_t before = svc_processor_peek_alerts();
+    uint32_t before = (uint32_t)app_service_get(SVC_PROCESSOR, PROCK_ALERTS, 0);
 
     g_sensor.value_mc = 45000;    /* 45 do C, tren nguong 30 */
     tick_n(6, 1000);              /* du de trung binh truot vuot nguong */
-    CHECK(svc_processor_peek_alerts() > before);
+    CHECK((uint32_t)app_service_get(SVC_PROCESSOR, PROCK_ALERTS, 0) > before);
 
     g_sensor.value_mc = 25000;    /* ve binh thuong */
     tick_n(6, 1000);
-    uint32_t settled = svc_processor_peek_alerts();
+    uint32_t settled = (uint32_t)app_service_get(SVC_PROCESSOR, PROCK_ALERTS, 0);
     tick_n(3, 1000);
-    CHECK_EQ(svc_processor_peek_alerts(), settled);  /* het vuot thi het bao */
+    CHECK_EQ((uint32_t)app_service_get(SVC_PROCESSOR, PROCK_ALERTS, 0), settled);  /* het vuot thi het bao */
 }
 
 /* ------------------------------------------------------------------ */
@@ -131,21 +132,21 @@ static void test_vuot_nguong_thi_co_canh_bao(void)
 static void test_mat_mang_thi_du_lieu_nam_lai_khong_mat(void)
 {
     tick_n(8, 1000);                       /* day sach hang doi truoc */
-    uint32_t uploaded_before = svc_uploader_peek_uploaded();
+    uint32_t uploaded_before = (uint32_t)app_service_get(SVC_UPLOADER, UPK_UPLOADED, 0);
 
     g_cloud.online = false;                /* rut day mang */
     tick_n(6, 1000);
 
-    CHECK_EQ(svc_uploader_peek_uploaded(), uploaded_before);  /* khong day duoc */
-    CHECK(svc_uploader_peek_pending() > 0);                   /* nhung con giu */
-    uint32_t held = svc_uploader_peek_pending();
+    CHECK_EQ((uint32_t)app_service_get(SVC_UPLOADER, UPK_UPLOADED, 0), uploaded_before);  /* khong day duoc */
+    CHECK((uint32_t)app_service_get(SVC_UPLOADER, UPK_PENDING, 0) > 0);                   /* nhung con giu */
+    uint32_t held = (uint32_t)app_service_get(SVC_UPLOADER, UPK_PENDING, 0);
 
     g_cloud.online = true;                 /* co mang lai */
     ipc_bus_publish(TOPIC_NET_STATE, 1, 0);
     app_poll_all();
 
-    CHECK_EQ(svc_uploader_peek_pending(), 0);
-    CHECK_EQ(svc_uploader_peek_uploaded(), uploaded_before + held);
+    CHECK_EQ((uint32_t)app_service_get(SVC_UPLOADER, UPK_PENDING, 0), 0);
+    CHECK_EQ((uint32_t)app_service_get(SVC_UPLOADER, UPK_UPLOADED, 0), uploaded_before + held);
 }
 
 static void test_loi_tam_thoi_thi_thu_lai(void)
@@ -155,23 +156,23 @@ static void test_loi_tam_thoi_thi_thu_lai(void)
 
     g_cloud.fail_next = 1;                 /* mot lan day bi loi */
     tick_n(4, 1000);                       /* du mot lo */
-    CHECK(svc_uploader_peek_pending() > 0);   /* giu lai, chua mat */
+    CHECK((uint32_t)app_service_get(SVC_UPLOADER, UPK_PENDING, 0) > 0);   /* giu lai, chua mat */
 
     tick_n(3, 1000);                       /* het thoi gian cho -> thu lai */
     CHECK(g_cloud.upload_count > uploads_before);
-    CHECK_EQ(svc_uploader_peek_pending(), 0);
+    CHECK_EQ((uint32_t)app_service_get(SVC_UPLOADER, UPK_PENDING, 0), 0);
 }
 
 static void test_hang_doi_tran_thi_bo_ban_ghi_cu_nhat_va_bao_len(void)
 {
     tick_n(8, 1000);
-    uint32_t dropped_before = svc_uploader_peek_dropped();
+    uint32_t dropped_before = (uint32_t)app_service_get(SVC_UPLOADER, UPK_DROPPED, 0);
 
     g_cloud.online = false;
     tick_n(30, 1000);                      /* nhieu hon suc chua cua hang doi */
 
-    CHECK(svc_uploader_peek_dropped() > dropped_before);  /* co mat, va duoc dem */
-    CHECK(svc_uploader_peek_pending() <= 16);             /* khong tran bo nho */
+    CHECK((uint32_t)app_service_get(SVC_UPLOADER, UPK_DROPPED, 0) > dropped_before);  /* co mat, va duoc dem */
+    CHECK((uint32_t)app_service_get(SVC_UPLOADER, UPK_PENDING, 0) <= 16);             /* khong tran bo nho */
 
     g_cloud.online = true;
     ipc_bus_publish(TOPIC_NET_STATE, 1, 0);
@@ -200,9 +201,9 @@ static void test_processor_chet_roi_hoi_sinh_khong_xu_ly_trung(void)
     CHECK_EQ(ipc_looper_generation(lp), gen_before + 1);
 
     /* Dem so lan processor cong bo DATA_READY qua bien dem cua uploader. */
-    uint32_t up_before = svc_uploader_peek_pending() + svc_uploader_peek_uploaded();
+    uint32_t up_before = (uint32_t)app_service_get(SVC_UPLOADER, UPK_PENDING, 0) + (uint32_t)app_service_get(SVC_UPLOADER, UPK_UPLOADED, 0);
     tick(1000);
-    uint32_t up_after = svc_uploader_peek_pending() + svc_uploader_peek_uploaded();
+    uint32_t up_after = (uint32_t)app_service_get(SVC_UPLOADER, UPK_PENDING, 0) + (uint32_t)app_service_get(SVC_UPLOADER, UPK_UPLOADED, 0);
 
     CHECK_EQ(up_after - up_before, 1);   /* dung mot ban ghi, khong phai hai */
 }
@@ -217,17 +218,17 @@ static void test_uploader_chet_thi_du_lieu_cho_van_con(void)
     g_cloud.online = false;
     tick_n(3, 1000);
 
-    uint32_t pending = svc_uploader_peek_pending();
+    uint32_t pending = (uint32_t)app_service_get(SVC_UPLOADER, UPK_PENDING, 0);
     CHECK(pending > 0);
 
     ipc_looper_t *lp = app_looper(SVC_UPLOADER);
     CHECK(ipc_looper_restart_inplace(lp));
-    CHECK_EQ(svc_uploader_peek_pending(), pending);   /* con nguyen */
+    CHECK_EQ((uint32_t)app_service_get(SVC_UPLOADER, UPK_PENDING, 0), pending);   /* con nguyen */
 
     g_cloud.online = true;
     ipc_bus_publish(TOPIC_NET_STATE, 1, 0);
     app_poll_all();
-    CHECK_EQ(svc_uploader_peek_pending(), 0);         /* va day duoc het */
+    CHECK_EQ((uint32_t)app_service_get(SVC_UPLOADER, UPK_PENDING, 0), 0);         /* va day duoc het */
 }
 
 /*
@@ -250,9 +251,9 @@ static void test_cam_bien_hong_lien_tuc_thi_health_khoi_dong_lai(void)
     CHECK_EQ(ipc_looper_generation(lp), gen_before + 1);
 
     /* Va sau khi hoi sinh, nhip lay mau phai chay tiep. */
-    int32_t s_before = svc_sensor_peek_samples();
+    int32_t s_before = app_service_get(SVC_SENSOR, SENSORK_SAMPLES, 0);
     tick_n(2, 1000);
-    CHECK(svc_sensor_peek_samples() > s_before);
+    CHECK(app_service_get(SVC_SENSOR, SENSORK_SAMPLES, 0) > s_before);
 }
 
 /*
@@ -284,11 +285,11 @@ static void test_giet_han_mot_dich_vu_phan_con_lai_van_chay(void)
     CHECK_EQ(ipc_looper_state(app_looper(SVC_UPLOADER)), IPC_LOOPER_STOPPED);
 
     /* Phan con lai: cam bien van doc, processor van xu ly, config van luu. */
-    int32_t s_before = svc_sensor_peek_samples();
+    int32_t s_before = app_service_get(SVC_SENSOR, SENSORK_SAMPLES, 0);
     g_sensor.value_mc = 26500;
     tick_n(2, 1000);
-    CHECK(svc_sensor_peek_samples() > s_before);
-    CHECK(ipc_cfg_get_int(CFG_LAST_VALUE, 0) != 0);
+    CHECK(app_service_get(SVC_SENSOR, SENSORK_SAMPLES, 0) > s_before);
+    CHECK(app_service_get(SVC_CONFIG, CFGK_LAST_VALUE, 0) != 0);
 }
 
 void run_system_tests(void)
