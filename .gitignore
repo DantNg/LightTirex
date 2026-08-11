@@ -1,0 +1,8 @@
+build_host/
+build/
+*.o
+*.a
+*.exe
+*.tmp
+*.cfg
+.vscode/
