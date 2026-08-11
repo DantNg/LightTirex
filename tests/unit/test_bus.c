@@ -87,6 +87,28 @@ static void test_huy_dang_ky_thi_ngung_nhan(void)
     CHECK_EQ(g_n1, 1);             /* khong tang nua */
 }
 
+/*
+ * Id dang ky ma hoa generation nen huy mot id da cu khong duoc dong toi
+ * nguoi dang ky moi da nhan lai slot do (loi ABA kinh dien).
+ */
+static void test_id_dang_ky_cu_khong_huy_nham_nguoi_moi(void)
+{
+    reset();
+    ipc_sub_id_t old = ipc_bus_subscribe(TOPIC_A, &g_h1, 1);
+    ipc_bus_unsubscribe(old);
+
+    /* Slot vua nha ra duoc cap lai cho nguoi khac. */
+    ipc_sub_id_t fresh = ipc_bus_subscribe(TOPIC_A, &g_h2, 2);
+    CHECK(old != fresh);
+
+    ipc_bus_unsubscribe(old);        /* khong duoc dong toi fresh */
+
+    ipc_bus_publish(TOPIC_A, 5, 0);
+    ipc_looper_poll(g_lp, 0);
+    CHECK_EQ(g_n1, 0);               /* nguoi cu da huy that */
+    CHECK_EQ(g_n2, 1);               /* nguoi moi van con nghe */
+}
+
 /* Gia tri giu lai: nguoi den sau van biet trang thai hien tai. */
 static void test_gia_tri_giu_lai_giao_ngay_khi_dang_ky(void)
 {
@@ -197,6 +219,7 @@ void run_bus_tests(void)
     RUN_TEST(test_khong_ai_nghe_thi_khong_phai_loi);
     RUN_TEST(test_chi_nhan_dung_chu_de_minh_dang_ky);
     RUN_TEST(test_huy_dang_ky_thi_ngung_nhan);
+    RUN_TEST(test_id_dang_ky_cu_khong_huy_nham_nguoi_moi);
     RUN_TEST(test_gia_tri_giu_lai_giao_ngay_khi_dang_ky);
     RUN_TEST(test_dang_ky_theo_ten_bam_theo_dich_vu);
     RUN_TEST(test_dich_vu_bien_mat_thi_dem_la_rot);

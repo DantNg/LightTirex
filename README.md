@@ -13,6 +13,7 @@ vẹn trên desktop để test.
 |---|---|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | bốn tầng, cây thư mục, ánh xạ khái niệm, SOLID, giới hạn |
 | [docs/FLOW.md](docs/FLOW.md) | **luồng chạy cụ thể**: khởi động, một mẫu chạy hết đường ống, đổi cấu hình, chết/hồi sinh, mất mạng |
+| [docs/OBSERVER.md](docs/OBSERVER.md) | **năm cơ chế quan sát**: event bus, linkToDeath, event group, health, heartbeat |
 | [docs/SERVICE_API.md](docs/SERVICE_API.md) | khuôn API chung của service: móc đời, `get`/`set` |
 | [docs/MODULES.md](docs/MODULES.md) | chi tiết timer, watchdog, health, config |
 
@@ -105,11 +106,11 @@ Chi tiết từng đường chết và cái gì sống sót qua hồi sinh:
 
 ## Test
 
-**59 test** chạy trên desktop với thời gian ảo, đơn luồng, không `sleep()`,
+**60 test** chạy trên desktop với thời gian ảo, đơn luồng, không `sleep()`,
 không thread, không phần cứng — hết trong vài mili giây và không bao giờ flaky.
 
 ```
-tests/unit/       timer (11), watchdog (6), config (9), health (11), bus (11)
+tests/unit/       timer (11), watchdog (6), config (9), health (11), bus (12)
 tests/behavior/   hành vi cả hệ thống (11)
 ```
 

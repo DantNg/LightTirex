@@ -2,6 +2,9 @@
 
 Tài liệu này mô tả **chuyện gì xảy ra, theo thứ tự nào, trên task nào**.
 
+Cơ chế quan sát đứng sau các mũi tên ở đây được mô tả riêng trong
+[OBSERVER.md](OBSERVER.md).
+
 Ký hiệu: mỗi bước ghi rõ chạy trên context nào — `[task X]` là task của service
 X, `[timer]` là task timer engine, `[caller]` là task của người gọi.
 

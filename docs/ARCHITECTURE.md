@@ -74,6 +74,10 @@ sống sót.
 Event group tồn tại vì semaphore không thay được: "đợi đến khi **cả** config
 **và** network sẵn sàng" bằng semaphore phải đếm thủ công và rất dễ sai.
 
+Cùng với `linkToDeath` (quan sát dịch vụ chết/sống lại), health probe và
+heartbeat, hệ có năm cơ chế quan sát khác nhau — xem [OBSERVER.md](OBSERVER.md)
+để biết dùng cái nào cho việc gì.
+
 ## SOLID
 
 | Nguyên tắc | Hiện ra ở đâu |
