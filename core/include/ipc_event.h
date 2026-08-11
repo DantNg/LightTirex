@@ -52,9 +52,12 @@ void ipc_bus_init(void);
 
 /*
  * Dang ky nghe bang con tro handler. Khi co su kien, nguoi nghe nhan mot
- * message voi msg->what = what va msg->topic = topic.
+ * message voi msg->what = deliver_as_what va msg->topic = topic.
+ * `deliver_as_what` do NGUOI NGHE chon: no quyet dinh nhanh nao trong bang
+ * dinh tuyen cua minh se chay.
  */
-ipc_sub_id_t ipc_bus_subscribe(uint32_t topic, ipc_handler_t *h, uint32_t what);
+ipc_sub_id_t ipc_bus_subscribe(uint32_t topic, ipc_handler_t *h,
+                               uint32_t deliver_as_what);
 
 /*
  * Dang ky nghe bang TEN dich vu. Bus phan giai handler tai thoi diem cong bo
@@ -62,7 +65,7 @@ ipc_sub_id_t ipc_bus_subscribe(uint32_t topic, ipc_handler_t *h, uint32_t what);
  * su kien. Day la cach nen dung cho dich vu co the bi khoi dong lai.
  */
 ipc_sub_id_t ipc_bus_subscribe_service(uint32_t topic, const char *service,
-                                       uint32_t what);
+                                       uint32_t deliver_as_what);
 
 void ipc_bus_unsubscribe(ipc_sub_id_t id);
 uint32_t ipc_bus_unsubscribe_handler(ipc_handler_t *h);

@@ -45,6 +45,10 @@ hay `configService` — nhưng cả hai đều nhận được `TOPIC_DATA_READY
         │                   │                          │ on_receive(msg)
 ```
 
+Tên hàm trong code cố ý phản ánh điều này: hàm giao việc tên là
+`enqueue_to_subscriber()` chứ không phải `deliver()` hay `notify()` — nó đẩy
+message vào hàng đợi rồi trả về, không chạy code của ai cả.
+
 **Điểm cốt lõi: bus không chạy callback của người quan sát.** Nó chuyển sự
 kiện thành `ipc_message_t` rồi đẩy vào **hàng đợi của looper đích**, xong trả
 về. Người quan sát xử lý sau, trên task của chính nó.
@@ -71,7 +75,7 @@ ipc_bus_subscribe_service(TOPIC_DATA_READY, SVC_UPLOADER, MSG_EV_DATA_READY);
 | Dùng cho | listener không bao giờ restart (console, UI cục bộ) | **mọi dịch vụ** |
 
 Trong hệ IoT, tất cả service đều đăng ký **theo tên**. Xem
-[deliver() — ipc_event.c:70](../core/src/ipc_event.c#L70): handler được phân
+[enqueue_to_subscriber() — ipc_event.c:208](../core/src/ipc_event.c#L208): handler được phân
 giải ngay trước khi giao, nên một dịch vụ vừa được hồi sinh với handler mới
 vẫn nhận đúng sự kiện đó.
 
@@ -88,10 +92,12 @@ lock(bus);
    chụp danh sách người nghe của topic vào mảng cục bộ
 unlock(bus);                       // ← thả khóa TRƯỚC khi giao
 for (mỗi người nghe trong bản chụp)
-   deliver()  → ipc_service_get() → ipc_message_obtain() → ipc_handler_send()
+   enqueue_to_subscriber() → ipc_service_get() → ipc_message_obtain()
+                           → ipc_handler_send()
 ```
 
-Vì sao phải thả khóa trước: `deliver()` chạm vào **mutex của looper khác** và
+Vì sao phải thả khóa trước: `enqueue_to_subscriber()` chạm vào **mutex của
+looper khác** và
 vào ServiceManager. Giữ khóa bus trong lúc đó tạo ra thứ tự khóa
 `bus → looper`, mà một luồng khác đang giữ khóa looper rồi gọi
 `subscribe()` sẽ tạo thứ tự ngược `looper → bus` — kinh điển của deadlock.
@@ -332,7 +338,7 @@ chạy. Ánh xạ:
 |---|---|
 | event manager | `ipc_event.c` (bảng đăng ký + hàm `publish`) |
 | hàng đợi độc lập của mỗi service | hàng đợi của `ipc_looper_t` mỗi service |
-| EM bỏ message vào hàng đợi listener | `deliver()` → `ipc_handler_send()` |
+| EM bỏ message vào hàng đợi listener | `enqueue_to_subscriber()` → `ipc_handler_send()` |
 | service register listener | `ipc_bus_subscribe_service()` trong `on_subscribe` |
 
 Khác biệt duy nhất còn lại: **event manager ở đây là một module, không phải một
