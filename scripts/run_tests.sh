@@ -13,14 +13,14 @@ OUT=${OUT:-$ROOT/build_host}
 mkdir -p "$OUT"
 
 CORE=$(ls "$ROOT"/core/src/*.c)
-SERVICES=$(ls "$ROOT"/services/src/*.c)
+SERVICES=$(ls "$ROOT"/services/*/*.c)
 TESTS=$(ls "$ROOT"/tests/unit/*.c "$ROOT"/tests/behavior/*.c "$ROOT"/tests/support/*.c)
 
 # shellcheck disable=SC2086
 "$CC" -std=c11 -Wall -Wextra -Wno-unused-parameter -g -O1 \
     -DIPC_PORT_HOST \
     -I"$ROOT/core/include" \
-    -I"$ROOT/services/include" \
+    -I"$ROOT/services" \
     -I"$ROOT/app" \
     -I"$ROOT/tests/support" \
     $CORE $SERVICES "$ROOT/app/app.c" "$ROOT/port/port_host.c" $TESTS \

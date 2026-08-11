@@ -1,5 +1,5 @@
 /*
- * svc_health.c - bang luat rieng cua ung dung + noi health voi supervisor.
+ * healthService.c - bang luat rieng cua ung dung + noi health voi supervisor.
  *
  * Core ipc_health khong biet gi ve cam bien hay server. No chi biet
  * "exception + luat -> hanh dong". File nay la noi khai bao CHINH SACH:
@@ -9,7 +9,8 @@
  * phai dong vao core.
  */
 #include "app.h"
-#include "services.h"
+#include "health/healthService.h"
+#include "common/services.h"
 
 #include "ipc_event.h"
 #include "ipc_health.h"
@@ -60,7 +61,7 @@ static void install_rules(void)
     const ipc_health_rule_t rules[] = {
         /* Doc cam bien hong le te la binh thuong (nhieu, I2C ban). Chi khi
          * hong 3 lan trong 10 giay moi khoi dong lai dich vu cam bien.
-         * Nguong nam O DAY chu khong trong svc_sensor.c: doc mot cho la biet
+         * Nguong nam O DAY chu khong trong sensorService.c: doc mot cho la biet
          * duoc luc nao dich vu se bi khoi dong lai. */
         { EXC_SENSOR_READ, SVC_SENSOR, IPC_SEV_WARN, 3, 10000,
           IPC_ACT_RESTART_SERVICE },
@@ -165,4 +166,4 @@ static app_service_t s_svc = {
     .set = health_set,
 };
 
-app_service_t *svc_health(void) { return &s_svc; }
+app_service_t *healthService(void) { return &s_svc; }

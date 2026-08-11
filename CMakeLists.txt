@@ -2,7 +2,7 @@
 #
 #   core/      framework doc lap nen tang
 #   port/      lop nen tang (FreeRTOS / desktop)
-#   services/  cac dich vu cua ung dung IoT
+#   services/  moi dich vu mot thu muc rieng (+ common/ va drivers/)
 #   app/       lap rap + diem vao
 #   tests/     test chay tren desktop
 #
@@ -10,14 +10,14 @@
 # Ngoai ESP-IDF: cmake -B build && cmake --build build && ctest --test-dir build
 
 file(GLOB LIGHTTIREX_CORE     "${CMAKE_CURRENT_LIST_DIR}/core/src/*.c")
-file(GLOB LIGHTTIREX_SERVICES "${CMAKE_CURRENT_LIST_DIR}/services/src/*.c")
+file(GLOB LIGHTTIREX_SERVICES "${CMAKE_CURRENT_LIST_DIR}/services/*/*.c")
 
 if(DEFINED ENV{IDF_PATH})
     idf_component_register(
         SRCS ${LIGHTTIREX_CORE} ${LIGHTTIREX_SERVICES}
              "app/app.c" "app/main.c"
              "port/port_freertos.c" "port/wdt_backend_esp32.c"
-        INCLUDE_DIRS "core/include" "services/include" "app"
+        INCLUDE_DIRS "core/include" "services" "app"
         REQUIRES freertos esp_system esp_timer
     )
 else()
@@ -31,7 +31,7 @@ else()
         app/app.c
         port/port_host.c
     )
-    target_include_directories(lightTirex PUBLIC core/include services/include app)
+    target_include_directories(lightTirex PUBLIC core/include services app)
     target_compile_definitions(lightTirex PUBLIC IPC_PORT_HOST)
     target_link_libraries(lightTirex PUBLIC Threads::Threads)
 

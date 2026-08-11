@@ -4,7 +4,7 @@
 #ifndef APP_H
 #define APP_H
 
-#include "drivers.h"
+#include "drivers/drivers.h"
 #include "ipc_config.h"
 #include "ipc_event_group.h"
 #include "ipc_looper.h"

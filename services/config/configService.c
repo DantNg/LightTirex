@@ -1,5 +1,5 @@
 /*
- * svc_config.c - cau hinh he thong + luu du lieu do duoc.
+ * configService.c - cau hinh he thong + luu du lieu do duoc.
  *
  * Hai vai tro, deu xoay quanh mot cai file:
  *   1. Giu cau hinh. Ai doi mot khoa thi no cong bo TOPIC_CONFIG_CHANGED,
@@ -11,7 +11,8 @@
  * mot lan sau khoang lang.
  */
 #include "app.h"
-#include "services.h"
+#include "config/configService.h"
+#include "common/services.h"
 
 #include "ipc_event.h"
 #include "ipc_health.h"
@@ -150,4 +151,4 @@ static app_service_t s_svc = {
     .set = config_set,
 };
 
-app_service_t *svc_config(void) { return &s_svc; }
+app_service_t *configService(void) { return &s_svc; }

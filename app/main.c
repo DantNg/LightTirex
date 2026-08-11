@@ -5,7 +5,7 @@
  * Tren desktop: chay ./app_demo de xem he thong chay that voi task that.
  */
 #include "app.h"
-#include "services.h"
+#include "common/services.h"
 
 #include "ipc_event.h"
 #include "ipc_port.h"

@@ -1,6 +1,6 @@
-#include "service_iface.h"
+#include "common/service_iface.h"
 
-#include "app_events.h"
+#include "common/app_events.h"
 #include "ipc_event.h"
 #include "ipc_event_group.h"
 #include "ipc_service.h"

@@ -5,7 +5,7 @@
  * chu de su kien, co dong bo, khoa cau hinh. Cac file svc_*.c KHONG include
  * lan nhau - chung chi cung include file nay.
  *
- * Do la diem mau chot: svc_uploader khong biet svc_sensor ton tai. No chi
+ * Do la diem mau chot: uploaderService khong biet sensorService ton tai. No chi
  * biet chu de TOPIC_DATA_READY. Thay cam bien khac, them mot nguon du lieu
  * thu hai, hay bo hoan uploader - khong file nao khac phai sua.
  *

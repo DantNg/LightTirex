@@ -115,7 +115,7 @@ làm nghẽn, dù uploader đang chờ mạng.
                            └─> ipc_timer_send_periodic_to(..., 300)
 ```
 
-Không service nào bị khởi động lại. `svc_config` không biết `svc_sensor` tồn
+Không service nào bị khởi động lại. `configService` không biết `sensorService` tồn
 tại — nó chỉ công bố một sự kiện.
 
 ---
@@ -152,8 +152,8 @@ Hai đường, tùy vì sao chết:
                  → IPC_ACT_RESTART_SERVICE → recover() → supervisor
 ```
 
-**Ai chịu trách nhiệm gì**: `svc_sensor` chỉ *báo sự việc*. Ngưỡng "3 lần trong
-10 giây" nằm trong bảng luật ở `svc_health.c`. Làm cả hai nơi thì ngưỡng bị
+**Ai chịu trách nhiệm gì**: `sensorService` chỉ *báo sự việc*. Ngưỡng "3 lần trong
+10 giây" nằm trong bảng luật ở `healthService.c`. Làm cả hai nơi thì ngưỡng bị
 chia đôi và không ai đọc code đoán được lúc nào service bị khởi động lại.
 
 ### Cái gì sống sót qua hồi sinh, cái gì không

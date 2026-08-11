@@ -26,8 +26,13 @@ không biết chạy trên FreeRTOS hay desktop.
 core/include/       API công khai của framework (ipc_*.h)
 core/src/           hiện thực
 port/               port_freertos.c, port_host.c, wdt_backend_esp32.c
-services/include/   app_events.h (bản hợp đồng), service_iface.h, services.h, drivers.h
-services/src/       service_iface.c (khung) + svc_*.c + drivers.c
+services/common/     app_events.h (bản hợp đồng), service_iface.h/.c (khung), services.h
+services/drivers/    cảm biến và server mock, đều sau interface
+services/sensor/     sensorService.h/.c
+services/processor/  processorService.h/.c
+services/config/     configService.h/.c
+services/uploader/   uploaderService.h/.c
+services/health/     healthService.h/.c
 app/                app.c (bảng service), app.h, main.c
 docs/               tài liệu
 tests/unit/         test từng module: timer, watchdog, config, health, bus
@@ -90,9 +95,9 @@ heartbeat, hệ có năm cơ chế quan sát khác nhau — xem [OBSERVER.md](OB
 
 ## Ranh giới trách nhiệm giữa các service
 
-Service **báo sự việc**; health **quyết định**. `svc_sensor` cố ý *không* tự
+Service **báo sự việc**; health **quyết định**. `sensorService` cố ý *không* tự
 leo thang mức độ theo số lần hỏng liên tiếp — ngưỡng "3 lần trong 10 giây thì
-restart" nằm trong bảng luật ở `svc_health.c`. Làm cả hai nơi thì ngưỡng bị
+restart" nằm trong bảng luật ở `healthService.c`. Làm cả hai nơi thì ngưỡng bị
 chia đôi và không ai đọc code đoán được lúc nào service bị khởi động lại.
 
 ## Giới hạn đã biết

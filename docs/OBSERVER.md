@@ -26,8 +26,8 @@ thể đã chết và không còn báo được gì.
 phải biết tên bên nhận. Thêm một người nghe mới thì phải sửa code bên gửi.
 
 Bus đảo ngược phụ thuộc: bên công bố chỉ nói *"có dữ liệu mới"*, ai quan tâm
-thì tự đăng ký. `svc_processor` không có một dòng nào nhắc đến `svc_uploader`
-hay `svc_config` — nhưng cả hai đều nhận được `TOPIC_DATA_READY`.
+thì tự đăng ký. `processorService` không có một dòng nào nhắc đến `uploaderService`
+hay `configService` — nhưng cả hai đều nhận được `TOPIC_DATA_READY`.
 
 ### Ba vai
 
@@ -49,7 +49,7 @@ hay `svc_config` — nhưng cả hai đều nhận được `TOPIC_DATA_READY`.
 kiện thành `ipc_message_t` rồi đẩy vào **hàng đợi của looper đích**, xong trả
 về. Người quan sát xử lý sau, trên task của chính nó.
 
-Hệ quả: `svc_sensor` không bao giờ bị `svc_uploader` làm nghẽn, kể cả khi
+Hệ quả: `sensorService` không bao giờ bị `uploaderService` làm nghẽn, kể cả khi
 uploader đang chờ mạng hàng giây. Nếu bus gọi callback trực tiếp thì cả dây
 chuyền sẽ chạy trên task sensor và một người nghe chậm sẽ khóa nhịp lấy mẫu.
 
@@ -177,7 +177,7 @@ unsubscribe_service(name)    → nhả mọi slot của tên đó   ← khung d�
 khác là **không thể** (lỗi ABA kinh điển). Có test riêng cho việc này.
 
 **Ai hủy đăng ký khi dịch vụ hồi sinh**: khung, không phải dịch vụ. Xem
-[service_iface.c](../services/src/service_iface.c) — trước mỗi lần gọi
+[service_iface.c](../services/common/service_iface.c) — trước mỗi lần gọi
 `on_subscribe()`, khung gọi `ipc_bus_unsubscribe_service(name)`. Nếu để dịch
 vụ tự làm và nó quên, sau mỗi lần hồi sinh nó sẽ nhận **mọi sự kiện hai lần**.
 Có test bắt đúng lỗi này (`test_processor_chet_roi_hoi_sinh_khong_xu_ly_trung`).
@@ -270,9 +270,9 @@ hàm chỉ ghi vào vòng đệm rồi trả về ngay (nên gọi được từ
 thì bỏ báo cáo **mới** và giữ báo cáo **cũ** — báo cáo đầu tiên của một sự cố
 thường có giá trị chẩn đoán cao nhất; số bị mất được đếm vào `dropped_reports`.
 
-Ranh giới trách nhiệm: **service báo sự việc, health quyết định.** `svc_sensor`
+Ranh giới trách nhiệm: **service báo sự việc, health quyết định.** `sensorService`
 cố ý không tự leo thang mức độ theo số lần hỏng liên tiếp — ngưỡng "3 lần
-trong 10 giây" nằm trong bảng luật ở `svc_health.c`.
+trong 10 giây" nằm trong bảng luật ở `healthService.c`.
 
 ---
 
@@ -321,6 +321,49 @@ Hệ thống chịu áp lực đó ở ba tầng:
 | Trỏ payload vào stack | người quan sát đọc phải rác | static / retained buffer |
 | Trông chờ thứ tự giống nhau giữa các listener | sai giả định | mỗi listener chỉ được đảm bảo FIFO của riêng nó |
 | Coi `publish() == 0` là lỗi | báo động giả | `0` = chưa ai quan tâm |
+
+## Event manager: module hay service có task riêng?
+
+Mô hình pub/sub qua một "event manager" chung, mỗi service một hàng đợi độc
+lập, event manager tự bỏ message vào hàng đợi của listener — chính là thứ đang
+chạy. Ánh xạ:
+
+| Khái niệm | Ở đây |
+|---|---|
+| event manager | `ipc_event.c` (bảng đăng ký + hàm `publish`) |
+| hàng đợi độc lập của mỗi service | hàng đợi của `ipc_looper_t` mỗi service |
+| EM bỏ message vào hàng đợi listener | `deliver()` → `ipc_handler_send()` |
+| service register listener | `ipc_bus_subscribe_service()` trong `on_subscribe` |
+
+Khác biệt duy nhất còn lại: **event manager ở đây là một module, không phải một
+service có task riêng.** `ipc_bus_publish()` chạy ngay trên task của người công
+bố — nó tra bảng rồi bỏ thẳng message vào hàng đợi của từng listener.
+
+Nếu biến EM thành service có task và hàng đợi riêng, luồng sẽ là:
+`publisher → hàng đợi EM → task EM thức dậy → fan-out → hàng đợi listener`.
+
+Cái giá trên MCU, đo được chứ không phải ước lượng:
+
+| | EM là module (hiện tại) | EM là service có task |
+|---|---|---|
+| Slot pool mỗi sự kiện | 1 (hoặc N nếu N listener) | **2** (hoặc 1+N) |
+| Sức chứa burst (pool 64) | 64 sự kiện | **32** |
+| Task / stack | 0 thêm | +1 |
+| Độ trễ | 1 chặng | **2 chặng** |
+| Điểm nghẽn chung | không | **có** — mọi sự kiện đi qua một task |
+
+Publisher **không** bị chặn ở cả hai phương án — ở phương án hiện tại nó chỉ
+lấy mutex ngắn, chụp danh sách rồi enqueue, không bao giờ chạy code của
+listener. Nên cái lợi duy nhất của EM-có-task (giảm việc trên task publisher)
+chỉ là vòng lặp fan-out qua N listener, mà N ở đây là 1–3.
+
+Đổi lại là chi phí thật: gấp đôi áp lực lên pool — đúng cái nút thắt đã đo
+(bắn 100 request không tiêu thụ kịp thì rớt 36 vì hết pool, không phải vì hàng
+đợi đầy). Vì vậy EM giữ nguyên là module.
+
+Khi nào nên đổi ý: nếu cần **ưu tiên sự kiện** (fan-out chạy ở priority riêng),
+cần **ghi log/trace tập trung** mọi sự kiện, hoặc listener nhiều tới mức vòng
+fan-out trên task publisher trở nên đáng kể (hàng chục listener một topic).
 
 ## Đọc thêm
 

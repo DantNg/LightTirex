@@ -22,7 +22,7 @@ vẹn trên desktop để test.
 ```
 core/       framework độc lập nền tảng  (include/ + src/)
 port/       nền tảng: FreeRTOS hoặc pthreads
-services/   hệ IoT: sensor, processor, config, uploader, health
+services/   mỗi dịch vụ một thư mục riêng + common/ + drivers/
 app/        lắp ráp (bảng service) + main
 docs/       tài liệu
 tests/      unit/ + behavior/ + support/
@@ -60,10 +60,10 @@ không có mạng).
 [config] --CONFIG_CHANGED--> (sensor đổi chu kỳ lấy mẫu, uploader đổi cỡ lô)
 ```
 
-**`svc_uploader` không biết `svc_sensor` tồn tại** — nó chỉ biết chủ đề
+**`uploaderService` không biết `sensorService` tồn tại** — nó chỉ biết chủ đề
 `TOPIC_DATA_READY`. Thêm cảm biến thứ hai, thêm màn hình hiển thị, hay bỏ hẳn
-uploader đều không đụng file nào khác. Toàn bộ giao kèo nằm trong
-[app_events.h](services/include/app_events.h); các file `svc_*.c` không include
+uploader đều không đụng thư mục nào khác. Toàn bộ giao kèo nằm trong
+[common/app_events.h](services/common/app_events.h); các file service không include
 lẫn nhau.
 
 Toàn bộ danh sách service nằm trong một bảng duy nhất
@@ -71,11 +71,11 @@ Toàn bộ danh sách service nằm trong một bảng duy nhất
 
 ```c
 static service_factory_fn const k_services[] = {
-    svc_config,     // trước tiên: mọi service khác đọc cấu hình của nó
-    svc_health,     // thứ hai: bắt được sự cố ngay từ lúc khởi động
-    svc_processor,  // người tiêu thụ sẵn sàng trước
-    svc_uploader,
-    svc_sensor,     // cuối cùng: nó là người bắt đầu sinh dữ liệu
+    configService,     // trước tiên: mọi service khác đọc cấu hình của nó
+    healthService,     // thứ hai: bắt được sự cố ngay từ lúc khởi động
+    processorService,  // người tiêu thụ sẵn sàng trước
+    uploaderService,
+    sensorService,     // cuối cùng: nó là người bắt đầu sinh dữ liệu
 };
 ```
 

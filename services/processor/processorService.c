@@ -1,5 +1,5 @@
 /*
- * svc_processor.c - bien du lieu tho thanh du lieu dung duoc.
+ * processorService.c - bien du lieu tho thanh du lieu dung duoc.
  *
  * Nghe TOPIC_SENSOR_SAMPLE, loc nhieu bang trung binh truot, cong bo
  * TOPIC_DATA_READY. Vuot nguong trong cau hinh thi cong bo them TOPIC_ALERT.
@@ -9,7 +9,8 @@
  * TOPIC_DATA_READY, ma khong sua file nay.
  */
 #include "app.h"
-#include "services.h"
+#include "processor/processorService.h"
+#include "common/services.h"
 
 #include "ipc_event.h"
 
@@ -102,7 +103,7 @@ static int32_t processor_get(app_service_t *self, uint32_t key, int32_t def)
 static bool processor_set(app_service_t *self, uint32_t key, int32_t value)
 {
     (void)self; (void)key; (void)value;
-    return false;   /* nguong nam trong cau hinh, doi qua svc_config */
+    return false;   /* nguong nam trong cau hinh, doi qua configService */
 }
 
 /* ---------------- bang mo ta ---------------- */
@@ -120,4 +121,4 @@ static app_service_t s_svc = {
     .set = processor_set,
 };
 
-app_service_t *svc_processor(void) { return &s_svc; }
+app_service_t *processorService(void) { return &s_svc; }

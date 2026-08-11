@@ -1,5 +1,5 @@
 /*
- * svc_sensor.c - doc cam bien theo chu ky, cong bo mau len bus.
+ * sensorService.c - doc cam bien theo chu ky, cong bo mau len bus.
  *
  * Hai diem dang chu y:
  *
@@ -9,10 +9,11 @@
  *
  * 2. No la NGUOI NGHE cua cau hinh: doi chu ky lay mau trong file thi su
  *    kien TOPIC_CONFIG_CHANGED toi day va timer duoc dat lai. Khong can khoi
- *    dong lai dich vu, va svc_config khong he biet svc_sensor ton tai.
+ *    dong lai dich vu, va configService khong he biet sensorService ton tai.
  */
 #include "app.h"
-#include "services.h"
+#include "sensor/sensorService.h"
+#include "common/services.h"
 
 #include "ipc_event.h"
 #include "ipc_health.h"
@@ -53,7 +54,7 @@ static void do_sample(void)
      *
      * Co y khong tu leo thang muc do theo so lan hong lien tiep: quyet dinh
      * "bao nhieu lan trong bao lau thi coi la hong that" la viec cua bang
-     * luat trong svc_health.c. Lam ca hai noi thi nguong bi chia doi va
+     * luat trong healthService.c. Lam ca hai noi thi nguong bi chia doi va
      * khong ai doc code doan duoc luc nao dich vu se bi khoi dong lai.
      */
     s_state.fail_streak++;
@@ -118,7 +119,7 @@ static int32_t sensor_get(app_service_t *self, uint32_t key, int32_t def)
 }
 
 /* Chu ky lay mau la cau hinh cua he thong, khong phai tham so rieng cua
- * cam bien - doi no thi doi qua svc_config de moi nguoi cung biet. */
+ * cam bien - doi no thi doi qua configService de moi nguoi cung biet. */
 static bool sensor_set(app_service_t *self, uint32_t key, int32_t value)
 {
     (void)self; (void)key; (void)value;
@@ -140,4 +141,4 @@ static app_service_t s_svc = {
     .set = sensor_set,
 };
 
-app_service_t *svc_sensor(void) { return &s_svc; }
+app_service_t *sensorService(void) { return &s_svc; }

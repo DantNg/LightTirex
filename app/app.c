@@ -6,7 +6,7 @@
  * dong rieng cho tung dich vu nao ca.
  */
 #include "app.h"
-#include "services.h"
+#include "common/services.h"
 
 #include "ipc_event.h"
 #include "ipc_event_group.h"
@@ -33,11 +33,11 @@
 typedef app_service_t *(*service_factory_fn)(void);
 
 static service_factory_fn const k_services[] = {
-    svc_config,
-    svc_health,
-    svc_processor,
-    svc_uploader,
-    svc_sensor,
+    configService,
+    healthService,
+    processorService,
+    uploaderService,
+    sensorService,
 };
 
 #define SERVICE_COUNT (sizeof(k_services) / sizeof(k_services[0]))

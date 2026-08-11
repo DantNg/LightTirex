@@ -12,7 +12,7 @@
  */
 #include "ipc_test.h"
 
-#include "app_events.h"
+#include "common/app_events.h"
 #include "ipc_clock.h"
 #include "ipc_config.h"
 #include "ipc_event.h"
@@ -20,7 +20,7 @@
 #include "ipc_service.h"
 #include "ipc_timer.h"
 #include "app.h"
-#include "services.h"
+#include "common/services.h"
 
 static ipc_fake_clock_t      g_clock;
 static sensor_driver_fake_t  g_sensor;

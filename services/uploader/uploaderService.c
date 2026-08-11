@@ -1,5 +1,5 @@
 /*
- * svc_uploader.c - gom du lieu thanh lo va day len server (mock).
+ * uploaderService.c - gom du lieu thanh lo va day len server (mock).
  *
  * Day la dich vu duy nhat cham vao the gioi ben ngoai, nen phai chiu duoc
  * viec the gioi ben ngoai khong dang tin:
@@ -12,7 +12,8 @@
  * va bao cao.
  */
 #include "app.h"
-#include "services.h"
+#include "uploader/uploaderService.h"
+#include "common/services.h"
 
 #include "ipc_event.h"
 #include "ipc_health.h"
@@ -221,4 +222,4 @@ static app_service_t s_svc = {
     .set = uploader_set,
 };
 
-app_service_t *svc_uploader(void) { return &s_svc; }
+app_service_t *uploaderService(void) { return &s_svc; }

@@ -28,12 +28,23 @@ static app_service_t s_svc = {
     .set = sensor_set,
 };
 
-app_service_t *svc_sensor(void) { return &s_svc; }
+app_service_t *sensorService(void) { return &s_svc; }
 ```
 
-Thêm service mới = viết một file theo khuôn này, khai báo `svc_xxx()` trong
-[services.h](../services/include/services.h), thêm một dòng vào bảng
-`k_services[]` trong [app.c](../app/app.c). Không sửa gì khác.
+Thêm service mới:
+
+1. `services/<tên>/<tên>Service.{h,c}` theo khuôn này — mỗi service một thư mục
+2. thêm một dòng `#include` vào [common/services.h](../services/common/services.h)
+3. thêm một dòng vào bảng `k_services[]` trong [app.c](../app/app.c)
+
+Không sửa gì khác. Header của service chỉ lộ ra đúng một hàm:
+
+```c
+app_service_t *sensorService(void);
+```
+
+Mọi thứ khác — nhận message, đọc/ghi tham số, khởi tạo lại — đi qua khuôn chung,
+nên một service không có cách nào lộ API riêng lẻ ra ngoài.
 
 ## Các móc đời
 
@@ -128,26 +139,26 @@ Quy ước:
 - Khóa chỉ đọc thì `set` trả `false`. Ví dụ `SENSORK_SAMPLES` là số liệu, không
   ai được ghi đè.
 - Khóa của mỗi service khai báo trong
-  [app_events.h](../services/include/app_events.h), mỗi service một không gian
+  [common/app_events.h](../services/common/app_events.h), mỗi service một không gian
   khóa riêng bắt đầu từ 1.
 
 ### Vì sao `set` đôi khi không sửa state trực tiếp
 
-`svc_uploader.set(UPK_ONLINE, 1)` không gán thẳng biến trong uploader — nó
+`uploaderService.set(UPK_ONLINE, 1)` không gán thẳng biến trong uploader — nó
 publish `TOPIC_NET_STATE`. Lý do: "có mạng lại" là sự kiện của cả hệ thống, ai
 quan tâm cũng cần biết, không riêng uploader. Sửa lút state bên trong thì
 những người nghe khác không hay biết gì.
 
-Tương tự, `svc_sensor.set()` luôn trả `false` cho chu kỳ lấy mẫu: đó là cấu
-hình của hệ thống, phải đi qua `svc_config` để mọi người cùng biết và để giá
+Tương tự, `sensorService.set()` luôn trả `false` cho chu kỳ lấy mẫu: đó là cấu
+hình của hệ thống, phải đi qua `configService` để mọi người cùng biết và để giá
 trị được lưu xuống file.
 
 ## Bản hợp đồng chung
 
 Tất cả những gì các service dùng để nói chuyện với nhau nằm trong
-[app_events.h](../services/include/app_events.h): tên service, chủ đề sự kiện,
+[common/app_events.h](../services/common/app_events.h): tên service, chủ đề sự kiện,
 khóa `get`/`set`, cờ đồng bộ, mã exception.
 
-Các file `svc_*.c` **không include lẫn nhau**. Đó là thứ giữ cho hệ thống tháo
-lắp được: `svc_uploader` không biết `svc_sensor` tồn tại, nó chỉ biết chủ đề
+Các file service **không include lẫn nhau**. Đó là thứ giữ cho hệ thống tháo
+lắp được: `uploaderService` không biết `sensorService` tồn tại, nó chỉ biết chủ đề
 `TOPIC_DATA_READY`.
