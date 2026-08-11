@@ -26,6 +26,7 @@ typedef void (*ipc_payload_free_fn)(void *payload);
 struct ipc_message {
     /* --- phan nguoi dung --- */
     uint32_t what;      /* ma lenh */
+    uint32_t topic;     /* != 0 neu message den tu event bus (xem ipc_event.h) */
     int32_t  arg1;
     int32_t  arg2;
     void    *payload;   /* con tro du lieu kem theo */

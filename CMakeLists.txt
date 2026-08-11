@@ -12,12 +12,25 @@ set(LIGHTTIREX_CORE
     src/ipc_watchdog.c
     src/ipc_health.c
     src/ipc_config.c
+    src/ipc_event.c
+    src/ipc_event_group.c
+)
+
+set(LIGHTTIREX_SERVICES
+    services/app.c
+    services/drivers.c
+    services/svc_config.c
+    services/svc_sensor.c
+    services/svc_processor.c
+    services/svc_uploader.c
+    services/svc_health.c
 )
 
 if(DEFINED ENV{IDF_PATH})
     idf_component_register(
-        SRCS ${LIGHTTIREX_CORE} "src/port_freertos.c" "src/wdt_backend_esp32.c"
-        INCLUDE_DIRS "include"
+        SRCS ${LIGHTTIREX_CORE} ${LIGHTTIREX_SERVICES}
+             "src/port_freertos.c" "src/wdt_backend_esp32.c"
+        INCLUDE_DIRS "include" "services"
         REQUIRES freertos esp_system esp_timer
     )
 else()
@@ -26,15 +39,16 @@ else()
     project(lightTirex C)
     set(CMAKE_C_STANDARD 11)
 
-    add_library(lightTirex STATIC ${LIGHTTIREX_CORE} src/port_host.c)
-    target_include_directories(lightTirex PUBLIC include)
+    add_library(lightTirex STATIC ${LIGHTTIREX_CORE} ${LIGHTTIREX_SERVICES} src/port_host.c)
+    target_include_directories(lightTirex PUBLIC include services)
     target_compile_definitions(lightTirex PUBLIC IPC_PORT_HOST)
     find_package(Threads REQUIRED)
     target_link_libraries(lightTirex PUBLIC Threads::Threads)
 
     enable_testing()
     add_executable(ipc_tests test/test_main.c test/test_timer.c test/test_watchdog.c
-                          test/test_config.c test/test_health.c)
+                          test/test_config.c test/test_health.c
+                          test/test_bus.c test/test_system.c)
     target_include_directories(ipc_tests PRIVATE test)
     target_link_libraries(ipc_tests PRIVATE lightTirex)
     add_test(NAME ipc_tests COMMAND ipc_tests)

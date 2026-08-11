@@ -273,6 +273,61 @@ Bốn quyết định đáng nói:
   test đếm chính xác `save_count`. Ghi lỗi thì giữ nguyên cờ dirty để còn thử
   lại.
 
+## Ứng dụng mẫu: hệ IoT trong `services/`
+
+Một hệ thật chạy trên khung này: đọc cảm biến → lọc nhiễu → lưu xuống file →
+đẩy lên server (mock, vì phòng lab không có mạng).
+
+```
+[sensor] --SENSOR_SAMPLE--> [processor] --DATA_READY--> [uploader] --> server
+                                 |                          |
+                                 +------DATA_READY------> [config]  (lưu file)
+                                 +--ALERT--> [health] --HEALTH_STATE-->
+[config] --CONFIG_CHANGED--> (sensor đổi chu kỳ lấy mẫu, uploader đổi cỡ lô)
+```
+
+Điểm cốt lõi: **`svc_uploader` không biết `svc_sensor` tồn tại.** Nó chỉ biết
+chủ đề `TOPIC_DATA_READY`. Thêm cảm biến thứ hai, thêm màn hình hiển thị, hay
+bỏ hẳn uploader — không file nào khác phải sửa. Toàn bộ giao kèo giữa các dịch
+vụ nằm gọn trong [app_events.h](services/app_events.h); các file `svc_*.c`
+không include lẫn nhau.
+
+### Ba cơ chế đồng bộ, dùng đúng chỗ
+
+| Cơ chế | Câu hỏi nó trả lời | Dùng cho |
+|--------|--------------------|----------|
+| Event bus ([ipc_event.h](include/ipc_event.h)) | "có chuyện gì xảy ra" | luồng dữ liệu, nhiều người nghe, không ai bị chặn |
+| Semaphore give/take | "có đúng một việc cần làm" | đánh thức looper (dùng bên trong) |
+| Event group ([ipc_event_group.h](include/ipc_event_group.h)) | "các điều kiện đã đủ chưa" | trình tự khởi động (`BIT_ALL_SERVICES`), trạng thái kéo dài (`BIT_NET_ONLINE`) |
+
+Event group tồn tại vì semaphore không thay được: "đợi đến khi **cả** config
+**và** network sẵn sàng" bằng semaphore phải đếm thủ công và rất dễ sai.
+
+Hai chi tiết khiến mô hình này sống sót qua chết/hồi sinh:
+
+- **Đăng ký nghe theo TÊN** (`ipc_bus_subscribe_service`) — bus phân giải
+  handler tại đúng thời điểm công bố, nên dịch vụ hồi sinh với handler mới vẫn
+  nhận tiếp.
+- **Giá trị giữ lại** (`publish_retained`) — dịch vụ vừa sống lại lấy được
+  ngay bức tranh hiện tại (trạng thái mạng, tình trạng sức khỏe) thay vì chạy
+  mù đến nhịp cập nhật sau.
+
+### Ranh giới trách nhiệm
+
+Service chỉ **báo sự việc**; health **quyết định**. `svc_sensor` cố ý *không*
+tự leo thang mức độ theo số lần hỏng liên tiếp — ngưỡng "3 lần trong 10 giây
+thì restart" nằm trong bảng luật ở [svc_health.c](services/svc_health.c). Nếu
+làm cả hai nơi thì ngưỡng bị chia đôi và không ai đọc code đoán được lúc nào
+dịch vụ sẽ bị khởi động lại.
+
+### Chạy trên board vs chạy trong test
+
+`app_cfg_t.spawn_tasks` quyết định: `true` thì mỗi dịch vụ có task RTOS thật;
+`false` thì chỉ tạo looper, test tự bơm nhịp bằng `app_poll_all()`. Cùng một
+code, cùng đường `on_start`. Cảm biến và server đều ở sau interface trong
+[drivers.h](services/drivers.h) nên test ép được lỗi đúng lúc mình muốn
+("cảm biến hỏng ở mẫu thứ 5", "mất mạng trong 3 lần đẩy").
+
 ## SOLID ở đây cụ thể là gì
 
 | Nguyên tắc | Hiện ra ở đâu |
@@ -317,10 +372,16 @@ ipc_timer_step(NULL); ipc_looper_poll(lp, 0);
 CHECK_EQ(received, 0);             // trước hạn: tuyệt đối không được bắn
 ```
 
-Bộ test hiện tại: 37 test (11 timer + 6 watchdog + 9 config + 11 health), đã
-mutation-test để chắc chắn chúng thật sự bắt lỗi chứ không phải xanh giả — một
-mutation sống sót đã được xử lý bằng cách bổ sung test, không phải bằng cách
-làm ngơ.
+Bộ test hiện tại: **59 test** — 11 timer, 6 watchdog, 9 config, 11 health,
+11 bus/event-group, 11 hành vi hệ thống. Nhóm cuối mô tả tình huống có thật
+chứ không test từng hàm: "mất mạng thì dữ liệu có mất không", "processor chết
+giữa chừng thì có xử lý trùng không", "cảm biến hỏng liên tục thì ai khởi động
+lại nó".
+
+Tất cả đã mutation-test để chắc chắn chúng thật sự bắt lỗi chứ không phải xanh
+giả. Ví dụ: bỏ dòng hủy đăng ký cũ trong `on_start` của processor → test bắt
+được ngay việc mỗi mẫu bị xử lý hai lần sau khi hồi sinh. Một mutation từng
+sống sót đã được xử lý bằng cách bổ sung test, không phải bằng cách làm ngơ.
 
 ## Cấu trúc
 
@@ -338,6 +399,10 @@ include/ipc_supervisor.h  giám sát và hồi sinh
 src/port_freertos.c       port FreeRTOS / ESP-IDF
 src/port_host.c           port desktop (pthreads), build với -DIPC_PORT_HOST
 src/wdt_backend_esp32.c   backend HW WDT cho ESP-IDF
+include/ipc_event.h       event bus (observer), đăng ký theo tên + retained
+include/ipc_event_group.h nhóm cờ sự kiện, chờ AND/OR
+services/                 ứng dụng IoT thật: sensor, processor, config,
+                          uploader, health + driver và server mock
 example/main.c            demo 3 dịch vụ + timer + watchdog + kịch bản crash
 test/                     test host, thời gian ảo
 ```

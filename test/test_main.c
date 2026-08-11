@@ -9,6 +9,8 @@ int main(void)
     run_watchdog_tests();
     run_config_tests();
     run_health_tests();
+    run_bus_tests();
+    run_system_tests();
 
     printf("\n%d test, %d that bai (%d check hong)\n",
            g_tests_run, g_tests_failed, g_checks_failed);

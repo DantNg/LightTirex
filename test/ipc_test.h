@@ -29,7 +29,7 @@ extern int g_tests_run, g_tests_failed, g_checks_failed;
     do {                                                                       \
         int before = g_checks_failed;                                          \
         g_tests_run++;                                                         \
-        printf("  %-42s", #fn);                                                \
+        printf("  %-52s", #fn);                                                \
         fflush(stdout);                                                        \
         fn();                                                                  \
         if (g_checks_failed != before) {                                       \
@@ -44,5 +44,7 @@ void run_timer_tests(void);
 void run_watchdog_tests(void);
 void run_config_tests(void);
 void run_health_tests(void);
+void run_bus_tests(void);
+void run_system_tests(void);
 
 #endif /* IPC_TEST_H */

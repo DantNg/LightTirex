@@ -179,6 +179,38 @@ void ipc_looper_destroy(ipc_looper_t *lp)
     ipc_exit_critical();
 }
 
+bool ipc_looper_is_task_driven(const ipc_looper_t *lp)
+{
+    return lp && lp->task != NULL;
+}
+
+bool ipc_looper_restart_inplace(ipc_looper_t *lp)
+{
+    if (!lp || !lp->in_use) return false;
+    if (lp->state == IPC_LOOPER_STOPPED) return false;
+
+    /* Message dang dispatch dang do: thu hoi de khong ro ri pool. */
+    if (lp->in_flight) {
+        ipc_message_t *m = lp->in_flight;
+        lp->in_flight = NULL;
+        ipc_message_recycle(m);
+    }
+    if (lp->cfg.purge_queue_on_restart) queue_purge(lp);
+
+    lp->quit_requested = false;
+    lp->quit_safely = false;
+    lp->task_gone = false;
+    lp->generation++;
+    lp->restart_count++;
+    lp->state = IPC_LOOPER_RUNNING;
+    lp->heartbeat_ms = ipc_clock_now();
+
+    /* Dung DUNG duong on_start ma task that se chay, nen hanh vi khoi tao
+     * lai duoc kiem chung y het tren board. */
+    if (lp->cfg.on_start) lp->cfg.on_start(lp, lp->cfg.user);
+    return true;
+}
+
 bool ipc_looper_start(ipc_looper_t *lp)
 {
     if (!lp || lp->state == IPC_LOOPER_RUNNING) return false;

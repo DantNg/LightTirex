@@ -91,6 +91,17 @@ void ipc_looper_run(ipc_looper_t *lp);
  */
 uint32_t ipc_looper_poll(ipc_looper_t *lp, uint32_t max_msgs);
 
+/* true neu looper co task RTOS rieng; false neu dang duoc bom nhip bang tay. */
+bool ipc_looper_is_task_driven(const ipc_looper_t *lp);
+
+/*
+ * Khoi dong lai looper MA KHONG tao task moi: tang generation, giu nguyen
+ * hang doi, chay lai on_start. Dung khi nguoi goi tu bom nhip (test), noi
+ * ma tao them mot task that se pha vo tinh don luong. Tren board hay dung
+ * ipc_looper_revive() qua supervisor.
+ */
+bool ipc_looper_restart_inplace(ipc_looper_t *lp);
+
 /* Looper gan voi task dang chay, hoac NULL. */
 ipc_looper_t *ipc_looper_my_looper(void);
 
